@@ -14,7 +14,10 @@
 9. License
 
 ## Introduction
-Resistector Connect is an application for monitoring and data acquisition from multiple Raspberry Pis over a network. The application includes a main control interface that pings clients and collects data from them, along with a graphical user interface for visualizing the collected data.
+Resistector Connect is the software part of my master thesis at LMU Munich Media Informatics. 
+It monitors and controls data flow from multiple Raspberry Pis over a network. Allowing to see and work with the data in plot charts and a WebApp. 
+It is based on an ADS1263 ADC and Raspberry Pi 4s. 
+
 
 ## Prerequisites
 - Raspberry Pi with Raspbian OS
