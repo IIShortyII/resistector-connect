@@ -3,8 +3,17 @@ import json
 from datetime import datetime
 import os
 import time
+import configparser
 
-pis = ['10.42.0.1', '10.42.0.2', '10.42.0.3']
+config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.ini')
+config = configparser.ConfigParser()
+config.read(config_path)
+
+def clean_value(value):
+    return value.split(';')[0].split('#')[0].strip()
+
+pis = list(map(clean_value, config['Network']['client_ips'].split(',')))
+port = clean_value(config['Network']['client_port'])
 
 if not os.path.exists('measurement_data'):
     os.makedirs('measurement_data')
@@ -15,7 +24,7 @@ filename = f"measurement_data/{current_datetime}_measurementData.json"
 def request_data():
     for pi in pis:
         try:
-            response = requests.get(f'http://{pi}:5000/measure')
+            response = requests.get(f'http://{pi}:{port}/measure')
             if response.status_code == 200:
                 data = response.json()
                 save_data(data, pi)

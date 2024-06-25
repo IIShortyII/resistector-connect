@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A modern UI for the Resistector application">
+  <meta name="author" content="Your Name">
+  <title>Resistector UI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <div class="sidebar">
+      <div class="sidebar-top">
+        <h1>Resistector UI</h1>
+      </div>
+
+      <div class="sidebar-mid">
+        <div class="controls">
+          <button>CONTROL 1</button>
+          <button>Button 2</button>
+          <button>Button 3</button>
+        </div>
+      </div>
+      <hr class="spacer">
+      <div class="sidebar-bottom">
+        <i>Resistector UI</i> <br>
+        <i>Masterthesis of Dennis Hofirek</i><br>
+        <a href="mailto:dennis.hofirek@campus.lmu.de">dennis.hofirek@campus.lmu.de</a> <br>
+        <i>LMU Munich</i><br>
+        <i>Media Informatics</i>
+      </div>
+    </div>
+    <div class="grid-container" id="grid-container">
+      <!-- Circles will be inserted here by JavaScript -->
+    </div>
+  </div>
+  <script>
+    const cols = {{ cols }};
+    const rows = {{ rows }};
+  </script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

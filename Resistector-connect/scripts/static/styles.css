@@ -1,0 +1,127 @@
+/* Reset some basic elements */
+body, h1, button {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  font-family: "Chakra Petch", sans-serif;
+  /*font-weight: 300;*/
+  font-style: normal;
+  background-color: #1a1a1a; /* Dunkler Hintergrund */
+  color: #f0f2f5; /* Hauptfarbe für den Text */
+}
+
+.container {
+  display: flex;
+  align-items: flex-start; /* Oben ausrichten */
+}
+
+.sidebar {
+  position: fixed; /* Sidebar fixieren */
+  top: 0;
+  left: 0;
+  width: max-content; /* Breite der Sidebar anpassen */
+  max-width: 325px;
+  height: 100vh;
+  background-color: #2d2d2d; /* Dunkle Hintergrundfarbe für die Sidebar */
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2); /* Schatten für die Sidebar */
+  z-index: 100; /* Z-Index setzen, damit die Sidebar über dem Inhalt liegt */
+  display: flex;
+  flex-direction: column; /* Buttons und Überschrift untereinander anordnen */
+}
+
+.sidebar-top {
+  background-color: #f0ad4e; /* Gelber Hintergrund für den oberen Teil */
+  height: 100px;
+  width: 87.5%;
+  padding: 20px;
+  border-radius: 0px 0px 5px 5px; 
+}
+
+.sidebar h1 {
+  font-size: 40px; /* Größe der Überschrift erhöht */
+  margin-bottom: 20px;
+  margin-left: 15px;
+  color: #f0f2f5; /* Überschrift in Hauptfarbe */
+}
+
+.sidebar-mid {
+  flex: 1; /* Flexibles Wachstum für den unteren Teil */
+  display: flex;
+  flex-direction: column; /* Buttons untereinander anordnen */
+  padding: 30px; /* Abstand zum oberen Teil */
+}
+.spacer {
+  width: 99%;
+}
+
+.sidebar-bottom{
+  height: max-content;
+  margin: 20px;
+
+}
+
+.controls button {
+  margin-bottom: 10px;
+  width: 80%;
+  padding: 10px;
+  font-size: 16px;
+  background-color: #f0f2f5; /* Hintergrund für die Buttons */
+  color: #1a1a1a; /* Textfarbe für die Buttons */
+  border: 2px solid #f0ad4e; /* Randfarbe für die Buttons */
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.controls button:hover {
+  background-color: #f0ad4e; /* Hintergrundfarbe hover */
+  color: #1a1a1a; /* Textfarbe hover */
+}
+
+.grid-container {
+  margin-left: 250px; /* Platz für die Sidebar lassen */
+  display: grid;
+  gap: 15px;
+  justify-items: center;
+  align-items: center;
+  border: 1px solid #ddd;
+  padding: 20px;
+  box-sizing: border-box;
+  width: calc(100vw - 250px); /* Dynamische Breite abzüglich der Sidebar-Breite */
+  max-width: 1200px;
+  height: 80vh;
+  max-height: 1000px;
+  background-color: #2d2d2d; /* Dunkler Hintergrund für das Grid */
+  color: #f0f2f5; /* Textfarbe für das Grid */
+}
+
+.circle {
+  border-radius: 50%;
+  border: 2px solid #f0ad4e; /* Randfarbe für den Kreis */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  background-color: #2d2d2d; /* Hintergrundfarbe für den Kreis */
+  transition: transform 0.2s;
+}
+
+.circle:hover {
+  transform: scale(1.1);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Vertikal zentrieren */
+  align-items: center; /* Horizontal zentrieren */
+  padding: 30px; /* Optional: Padding anpassen */
+}
