@@ -3,13 +3,41 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 import os
+import logging
+import numpy as np
 from matplotlib.animation import FuncAnimation
+from datetime import datetime
+
+
+CONFIG = {
+    'data_dir': 'measurement_data',
+    'log_dir': os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs'),
+    'log_file': 'plot.log',
+    'plot_interval': 500,
+    'figsize': (10, 18),
+    'num_subplots': 3,
+    'y_limit': 2200,
+    'default_value': 3000  # Standardwert für fehlende Sensordaten
+}
+
+
+LOG_PATH = os.path.join(CONFIG['log_dir'], CONFIG['log_file'])
+if not os.path.exists(CONFIG['log_dir']):
+    os.makedirs(CONFIG['log_dir'])
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.FileHandler(LOG_PATH)]
+)
+
+
 
 def load_latest_data(folder_path, last_timestamp=None):
     json_files = glob.glob(os.path.join(folder_path, '*_measurementData.json'))
     
     if not json_files:
-        print("Keine JSON-Dateien im Ordner gefunden.")
+        logging.info("Keine JSON-Dateien im Ordner gefunden.")
         return []
 
     sorted_files = sorted(json_files, key=os.path.getmtime, reverse=True)
@@ -21,36 +49,38 @@ def load_latest_data(folder_path, last_timestamp=None):
             try:
                 record = json.loads(line)
                 if last_timestamp is None or record['timestamp'] > last_timestamp:
+                    if not record['sensor_data']:
+                        record['sensor_data'] = {'default_channel': CONFIG['default_value']}
                     data.append(record)
             except json.JSONDecodeError as e:
-                print(f"Fehler beim Laden der JSON-Daten aus Zeile: {e}")
+                logging.error(f"Fehler beim Laden der JSON-Daten aus Zeile: {e}")
     
     return data
 
 def plot_data(axs, data):
     if not data:
-        print("Keine Daten vorhanden.")
+        logging.info("Keine Daten vorhanden.")
         return []
 
     df = pd.DataFrame(data)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
 
     unique_addresses = df['pi-address'].unique()
-
     lines = []
 
     for ax in axs:
         ax.clear()
-        ax.set_ylim(0, 2200)
+        ax.set_ylim(0, CONFIG['y_limit'])
 
     for i, pi_address in enumerate(unique_addresses):
         df_pi = df[df['pi-address'] == pi_address]
         axs[i].set_title(f'Daten für Pi-Adresse: {pi_address}')
         axs[i].set_ylabel('Wert')
 
-        for channel in df_pi['sensor_data'].iloc[0].keys():
-            values = [entry[channel] for entry in df_pi['sensor_data']]
-            timestamps = df_pi['timestamp'].values
+        sensor_data_keys = df_pi['sensor_data'].apply(lambda x: x.keys() if isinstance(x, dict) else {}).explode().unique()
+        for channel in sensor_data_keys:
+            values = df_pi['sensor_data'].apply(lambda x: x.get(channel, CONFIG['default_value']) if isinstance(x, dict) else CONFIG['default_value']).to_numpy()
+            timestamps = df_pi['timestamp'].to_numpy()
             line, = axs[i].plot(timestamps, values, label=channel)
             lines.append(line)
 
@@ -72,14 +102,15 @@ def update_plot(frame, folder_path, axs, lines, last_timestamp):
     df['timestamp'] = pd.to_datetime(df['timestamp'])
 
     unique_addresses = df['pi-address'].unique()
-
     line_index = 0
+
     for i, pi_address in enumerate(unique_addresses):
         df_pi = df[df['pi-address'] == pi_address]
 
-        for channel in df_pi['sensor_data'].iloc[0].keys():
-            values = [entry[channel] for entry in df_pi['sensor_data']]
-            timestamps = df_pi['timestamp'].values
+        sensor_data_keys = df_pi['sensor_data'].apply(lambda x: x.keys() if isinstance(x, dict) else {}).explode().unique()
+        for channel in sensor_data_keys:
+            values = df_pi['sensor_data'].apply(lambda x: x.get(channel, CONFIG['default_value']) if isinstance(x, dict) else CONFIG['default_value']).to_numpy()
+            timestamps = df_pi['timestamp'].to_numpy()
             lines[line_index].set_data(timestamps, values)
             line_index += 1
 
@@ -90,14 +121,21 @@ def update_plot(frame, folder_path, axs, lines, last_timestamp):
     plt.tight_layout()
     return last_timestamp
 
-if __name__ == "__main__":
-    folder_path = 'measurement_data'
+def main():
+    folder_path = CONFIG['data_dir']
     
-    fig, axs = plt.subplots(3, 1, figsize=(10, 18), sharex=True)
+    fig, axs = plt.subplots(CONFIG['num_subplots'], 1, figsize=CONFIG['figsize'], sharex=True)
     last_timestamp = None
     initial_data = load_latest_data(folder_path, last_timestamp)
     lines = plot_data(axs, initial_data)
     last_timestamp = initial_data[-1]['timestamp'] if initial_data else None
     
-    ani = FuncAnimation(fig, update_plot, fargs=(folder_path, axs, lines, last_timestamp), interval=500)
+    ani = FuncAnimation(fig, update_plot, fargs=(folder_path, axs, lines, last_timestamp), interval=CONFIG['plot_interval'])
+    logging.info("Plotting session started")
     plt.show()
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        logging.critical(f"Unhandled exception: {e}", exc_info=True)
