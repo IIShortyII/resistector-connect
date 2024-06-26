@@ -48,9 +48,23 @@ and the ClientPis which hold the measuring and data providing.
  4. Adjust the config.ini to fit your Network Setting
     
 ### ClientPis
-1. Copy `measurementClient.py`, `config.ini` and the ADC folder to your ClientPi
+1. Copy the scripts folder and `config.ini`  to your ClientPi/home/USER/Resistector-connect
 2. Connect to the MainPi AccessPoint
 3. Adjust the config.ini to fit your Network Settings
+4. Optional: Add the `measurementClient.py` to `rc.local` to automatically start the Client with every reboot
+  - Open terminal and open the rc.local file:  
+    ```sh
+    sudo nano /etc/rc.local
+    ```
+  -  Add the following above `exit 0`, you may have to adjust the path to fit your location:
+```sh
+    /usr/bin/python3 /home/resistector/Resistector-connect/scripts/measurementClient.py > /home/resistector/Resistector-connect/logs/autostart.log 2>&1 &  
+```
+  - save with `ctrl + S` and exit nano with `ctrl + X`
+  - reboot with command:
+     ```sh
+    reboot
+     ```
 
 ## Configuration MainPi
 Adjust the `config.ini` file according to your network and sensor configuration:
