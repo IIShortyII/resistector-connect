@@ -22,17 +22,33 @@ config = configparser.ConfigParser()
 config.read(config_path)
 
 def clean_value(value):
+    """
+    Cleans a configuration value by removing comments and whitespace.
+
+    Args:
+        value (str): The value to be cleaned.
+
+    Returns:
+        str: The cleaned value.
+    """
     return value.split(';')[0].split('#')[0].strip()
-
-
-
 
 subprocess.run(["xdotool", "search", "--class", "lxterminal", "set_window", "--name", "Resistector-Status", "%@"], check=True)
 logging.info("Startup")
 time.sleep(1)
 
-
 class ScriptManager:
+    """
+    Manages the execution of scripts.
+
+    Attributes:
+        script_name (str): The name of the script to be managed.
+        script_base_name (str): The base name of the script (without extension).
+        script_path (str): The full path to the script.
+        pid_file_path (str): The path to the file storing the process ID.
+        process_pid (int): The process ID of the running script.
+        append_to_console (function): Function to append messages to the console.
+    """
     def __init__(self, script_name, scripts_dir, tmp_dir, append_to_console):
         self.script_name = script_name
         self.script_base_name = os.path.splitext(script_name)[0]
@@ -42,6 +58,15 @@ class ScriptManager:
         self.append_to_console = append_to_console
 
     def start_script(self, minimized=False):
+        """
+        Starts the script in a new terminal window.
+
+        Args:
+            minimized (bool): If True, the terminal window will be minimized.
+
+        Returns:
+            int: The process ID of the started script.
+        """
         subprocess.Popen(["lxterminal", "-e", f"bash -c 'python3 {self.script_path} & echo $! > {self.pid_file_path}; exec bash'"])
         if minimized:
             self.minimize_terminal()
@@ -52,6 +77,9 @@ class ScriptManager:
         return self.process_pid
 
     def minimize_terminal(self):
+        """
+        Minimizes the terminal window running the script.
+        """
         time.sleep(0.5)  # Give the terminal some time to start
         try:
             window_id_string = subprocess.check_output(["xdotool", "search", "--sync", "--onlyvisible", "--class", "lxterminal"]).strip().decode('utf-8')
@@ -69,6 +97,12 @@ class ScriptManager:
             logging.exception(f"While minimizing window {self.script_name} an error occured")
 
     def is_process_running(self):
+        """
+        Checks if the script process is still running.
+
+        Returns:
+            bool: True if the process is running, False otherwise.
+        """
         if self.process_pid:
             try:
                 os.kill(self.process_pid, 0)
@@ -78,6 +112,9 @@ class ScriptManager:
         return False
 
     def monitor_process(self):
+        """
+        Monitors the script process and logs its status.
+        """
         if self.is_process_running():
             root.after(5000, self.monitor_process)
         else:
@@ -90,16 +127,36 @@ class ScriptManager:
                 measurement_server_running = False
 
 class ClientStatus:
+    """
+    Represents the status of a client.
+
+    Attributes:
+        is_available (bool): Indicates if the client is available.
+        is_registered (bool): Indicates if the client is registered.
+    """
     def __init__(self):
         self.is_available = False
         self.is_registered = False
 
 class ClientManager:
+    """
+    Manages the connection to a client.
+
+    Attributes:
+        ip (str): The IP address of the client.
+        status (ClientStatus): The status of the client.
+    """
     def __init__(self, ip):
         self.ip = ip
         self.status = ClientStatus()
 
     def ping(self):
+        """
+        Pings the client to check if it is reachable.
+
+        Returns:
+            bool: True if the client responds to the ping, False otherwise.
+        """
         command = ['ping', '-c', '1', self.ip]
         try:
             result = subprocess.run(command, capture_output=True, text=True, timeout=5)
@@ -108,6 +165,12 @@ class ClientManager:
             return False
 
     def connect(self):
+        """
+        Attempts to connect to the client.
+
+        Returns:
+            bool: True if the connection is successful, False otherwise.
+        """
         try:
             response = requests.get(f"http://{self.ip}:5000/measure", timeout=5)
             return response.status_code == 200
@@ -115,6 +178,20 @@ class ClientManager:
             return False
 
 class App:
+    """
+    Represents the main application.
+
+    Attributes:
+        root (tk.Tk): The root Tkinter window.
+        registeredClients (int): The number of registered clients.
+        measurement_server_running (bool): Indicates if the measurement server is running.
+        bootupCheck (bool): Indicates if the bootup check is in progress.
+        clientIPs (list): List of client IP addresses.
+        clients (dict): Dictionary of ClientManager objects.
+        scripts_dir (str): Directory containing the scripts.
+        tmp_dir (str): Temporary directory for storing PID files.
+        script_names (list): List of script names to be managed.
+    """
     def __init__(self, root):
         self.root = root
         self.registeredClients = 0
@@ -132,6 +209,9 @@ class App:
         self.schedule_tasks()
 
     def init_ui(self):
+        """
+        Initializes the user interface.
+        """
         self.root.title("Resistector Status")
         self.root.geometry("1351x755+180+138")
         self.console = scrolledtext.ScrolledText(self.root, state='disabled', bg='black', fg='white', font=('Courier New', 12), height=15, width=97)
@@ -152,6 +232,13 @@ class App:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def append_to_console(self, message, color=None):
+        """
+        Appends a message to the console.
+
+        Args:
+            message (str): The message to be appended.
+            color (str, optional): The color of the message text.
+        """
         self.console.config(state=tk.NORMAL)
         if color:
             self.console.tag_config(color, foreground=color)
@@ -162,6 +249,9 @@ class App:
         self.console.see(tk.END)
 
     def welcome_text(self):
+        """
+        Displays a welcome message in the console.
+        """
         ascii_art = """ 
         ____            _      __            __                
        / __ \___  _____(______/ /____  _____/ /_____  _____    
@@ -176,6 +266,9 @@ class App:
         self.append_to_console(ascii_art, "yellow")
 
     def kill_windows(self):
+        """
+        Closes all lxterminal windows associated with the application.
+        """
         try:
             window_id_string = subprocess.check_output(["xdotool", "search", "--class", "lxterminal"]).strip().decode('utf-8')
             window_ids = window_id_string.split('\n')
@@ -190,15 +283,27 @@ class App:
             logging.exception("Error searching for windows with class 'lxterminal'")
 
     def start_regular_process(self, script_name):
+        """
+        Starts a regular process using ScriptManager.
+
+        Args:
+            script_name (str): The name of the script to be started.
+        """
         script_manager = ScriptManager(script_name, self.scripts_dir, self.tmp_dir, self.append_to_console)
         script_manager.start_script(minimized=True)
         script_manager.monitor_process()
 
     def startup_scripts(self):
+        """
+        Starts all necessary scripts at startup.
+        """
         for script_name in self.script_names:
             self.start_regular_process(script_name)
 
     def client_watchdog(self):
+        """
+        Monitors the status of all clients and updates the UI accordingly.
+        """
         self.registeredClients = 0
         for clientIP in self.clientIPs:
             client_manager = self.clients[clientIP]
@@ -241,26 +346,38 @@ class App:
         self.root.after(10000, self.client_watchdog)
 
     def on_closing(self):
+        """
+        Handles the application closing event.
+        """
         self.append_to_console("Stopping processes... Please stand by...", color="yellow")
         logging.info("Shutdown initialised ")
         self.kill_windows()
         self.root.after(3000, self.root.destroy)
 
     def schedule_tasks(self):
+        """
+        Schedules periodic tasks.
+        """
         #self.root.after(1000, self.welcome_text)
         self.root.after(5000, self.client_watchdog)
 
-
 def handle_exception(exc_type, exc_value, exc_traceback):
+    """
+    Handles uncaught exceptions by logging them.
+
+    Args:
+        exc_type (type): The exception type.
+        exc_value (Exception): The exception instance.
+        exc_traceback (traceback): The traceback object.
+    """
     if issubclass(exc_type, KeyboardInterrupt):
-        # Ignoriere Tastaturunterbrechungen, damit das Programm normal beendet werden kann
+        # Ignore keyboard interruptions to allow normal program termination
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
-    # Protokolliere die Ausnahme
+    # Log the exception
     logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 sys.excepthook = handle_exception
-
 
 # Initialize Tkinter Window
 root = tk.Tk()

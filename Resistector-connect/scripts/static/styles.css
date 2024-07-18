@@ -125,3 +125,14 @@ body {
   align-items: center; /* Horizontal zentrieren */
   padding: 30px; /* Optional: Padding anpassen */
 }
+
+.timestamp-container {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  background-color: #2d2d2d; /* Dunkler Hintergrund für den Timestamp */
+  color: #f0f2f5; /* Textfarbe */
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Schatten für besseren Kontrast */
+}

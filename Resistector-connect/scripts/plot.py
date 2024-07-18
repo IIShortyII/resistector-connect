@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from datetime import datetime
 
-
+# Konfigurationsparameter
 CONFIG = {
     'data_dir': 'measurement_data',
     'log_dir': os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs'),
@@ -20,7 +20,7 @@ CONFIG = {
     'default_value': 3000  # Standardwert für fehlende Sensordaten
 }
 
-
+# Logging-Konfiguration
 LOG_PATH = os.path.join(CONFIG['log_dir'], CONFIG['log_file'])
 if not os.path.exists(CONFIG['log_dir']):
     os.makedirs(CONFIG['log_dir'])
@@ -31,9 +31,17 @@ logging.basicConfig(
     handlers=[logging.FileHandler(LOG_PATH)]
 )
 
-
-
 def load_latest_data(folder_path, last_timestamp=None):
+    """
+    Lädt die neuesten Messdaten aus JSON-Dateien im angegebenen Ordner.
+
+    Args:
+        folder_path (str): Der Pfad zum Ordner, der die JSON-Dateien enthält.
+        last_timestamp (str, optional): Der letzte Zeitstempel, ab dem die Daten geladen werden sollen. Standard ist None.
+
+    Returns:
+        list: Eine Liste der geladenen Datensätze.
+    """
     json_files = glob.glob(os.path.join(folder_path, '*_measurementData.json'))
     
     if not json_files:
@@ -58,6 +66,16 @@ def load_latest_data(folder_path, last_timestamp=None):
     return data
 
 def plot_data(axs, data):
+    """
+    Erstellt initiale Plots mit den bereitgestellten Daten.
+
+    Args:
+        axs (list): Liste der Achsenobjekte für die Subplots.
+        data (list): Die zu plottenden Daten.
+
+    Returns:
+        list: Eine Liste der Linienobjekte, die in den Subplots gezeichnet werden.
+    """
     if not data:
         logging.info("Keine Daten vorhanden.")
         return []
@@ -93,6 +111,19 @@ def plot_data(axs, data):
     return lines
 
 def update_plot(frame, folder_path, axs, lines, last_timestamp):
+    """
+    Aktualisiert die Plots mit neuen Daten.
+
+    Args:
+        frame (int): Der aktuelle Frame der Animation.
+        folder_path (str): Der Pfad zum Ordner, der die JSON-Dateien enthält.
+        axs (list): Liste der Achsenobjekte für die Subplots.
+        lines (list): Liste der Linienobjekte, die in den Subplots gezeichnet werden.
+        last_timestamp (str): Der letzte Zeitstempel, bis zu dem die Daten geladen wurden.
+
+    Returns:
+        str: Der neue letzte Zeitstempel nach dem Laden der neuesten Daten.
+    """
     new_data = load_latest_data(folder_path, last_timestamp)
     if not new_data:
         return last_timestamp
@@ -122,6 +153,9 @@ def update_plot(frame, folder_path, axs, lines, last_timestamp):
     return last_timestamp
 
 def main():
+    """
+    Der Hauptteil des Skripts, der die Daten lädt, initiale Plots erstellt und die Animation startet.
+    """
     folder_path = CONFIG['data_dir']
     
     fig, axs = plt.subplots(CONFIG['num_subplots'], 1, figsize=CONFIG['figsize'], sharex=True)
