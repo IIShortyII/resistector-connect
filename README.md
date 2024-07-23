@@ -85,6 +85,9 @@ client_ips = 10.42.0.1, 10.42.0.2, 10.42.0.3    #all IP addresses of the clients
 client_port = 5000                              #all clients share the same port
 webapp_port = 5050                              #the ResistectorUI port
 
+[Web-UI]
+amountX-Axis = 8                                # The amount of measurement points in the horizontal(X) axis
+amountY-Axis = 6                                # The amount of measurement poins in the vertical(Y) axis
 
 ```
 ## Usage
