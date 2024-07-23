@@ -217,13 +217,13 @@ class App:
         self.console = scrolledtext.ScrolledText(self.root, state='disabled', bg='black', fg='white', font=('Courier New', 12), height=15, width=97)
         self.console.place(relx=0.015, rely=0.026, relheight=0.531, relwidth=0.97)
         
-        self.button_close = tk.Button(self.root, text="Herunterfahren", width=30, height=5, command=self.on_closing)
+        self.button_close = tk.Button(self.root, text="Shutdown", width=30, height=5, command=self.on_closing)
         self.button_close.place(relx=0.844, rely=0.583, height=36, width=177)
         
-        self.button_Plotter = tk.Button(self.root, text="Starte Plotter", width=30, height=5, state="disabled", command=lambda: self.start_regular_process("plot.py"))
+        self.button_Plotter = tk.Button(self.root, text="Start Plotter", width=30, height=5, state="disabled", command=lambda: self.start_regular_process("plot.py"))
         self.button_Plotter.place(relx=0.192, rely=0.728, height=76, width=287)
         
-        self.button_UI = tk.Button(self.root, text="Starte Resistector UI", width=30, height=5, command=lambda: self.start_regular_process("resistectorUI.py"))
+        self.button_UI = tk.Button(self.root, text="Start ResistectorUI", width=30, height=5, state="disabled", command=lambda: self.start_regular_process("resistectorUI.py"))
         self.button_UI.place(relx=0.585, rely=0.728, height=76, width=287)
         
         separator = ttk.Separator(self.root)
@@ -333,6 +333,7 @@ class App:
 
         if self.registeredClients == len(self.clientIPs):
             self.button_Plotter.config(state=tk.NORMAL)
+            self.button_UI.config(state=tk.NORMAL)
             if not self.measurement_server_running:
                 self.append_to_console("All clients registered. Measurement server startup", "green")
                 logging.info("All clients registered. Measurement server is starting")
@@ -340,6 +341,7 @@ class App:
                 self.measurement_server_running = True
         else:
             self.button_Plotter.config(state=tk.DISABLED)
+            self.button_UI.config(state=tk.DISABLED)
             self.measurement_server_running = False
 
         self.bootupCheck = False

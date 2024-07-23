@@ -3,23 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="A modern UI for the Resistector application">
-  <meta name="author" content="Your Name">
+  <meta name="description" content="A modern UI for Resistector">
+  <meta name="author" content="Dennis Hofirek">
   <title>Resistector UI</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='ResistectorUI.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
+      <button id="toggle-btn" class="toggle-btn">&#11144;</button>
       <div class="sidebar-top">
         <h1>Resistector UI</h1>
+        <img src="{{ url_for('static', filename='ResistectorUI.png') }}" alt="Resistector Logo" class="logo">
       </div>
       <div class="sidebar-mid">
         <div class="controls">
           <button>CONTROL 1</button>
           <button>Button 2</button>
-          <button>Button 3</button>
+          <div class="toggle-container">
+            <label class="switch">
+                <input type="checkbox" id="toggle-details">
+                <span class="slider round"></span>
+            </label>
+            <span class="toggle-label">Show Measurement Point Details</span>
+        </div>        
         </div>
       </div>
       <hr class="spacer">
@@ -35,7 +43,6 @@
       <!-- Circles will be inserted here by JavaScript -->
     </div>
   </div>
-
   <script>
     const cols = {{ cols }};
     const rows = {{ rows }};

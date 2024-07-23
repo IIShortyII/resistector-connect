@@ -5,67 +5,96 @@ body, h1, button {
   box-sizing: border-box;
 }
 
+@font-face {
+  font-family:'Chakra Petch';
+  src: url('fonts/Chakra_Petch/ChakraPetch-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family:'Chakra Petch';
+  src: url('fonts/Chakra_Petch/ChakraPetch-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
 body {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
   margin: 0;
-  font-family: "Chakra Petch", sans-serif;
-  /*font-weight: 300;*/
-  font-style: normal;
-  background-color: #1a1a1a; /* Dunkler Hintergrund */
-  color: #f0f2f5; /* Hauptfarbe für den Text */
+  font-family:"Chakra Petch", sans-serif;
+  background-color: #1a1a1a;
+  color: #f0f2f5;
 }
 
 .container {
   display: flex;
-  align-items: flex-start; /* Oben ausrichten */
+  align-items: flex-start;
 }
 
 .sidebar {
-  position: fixed; /* Sidebar fixieren */
+  position: fixed;
   top: 0;
   left: 0;
-  width: max-content; /* Breite der Sidebar anpassen */
-  max-width: 325px;
+  width: 250px;
   height: 100vh;
-  background-color: #2d2d2d; /* Dunkle Hintergrundfarbe für die Sidebar */
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2); /* Schatten für die Sidebar */
-  z-index: 100; /* Z-Index setzen, damit die Sidebar über dem Inhalt liegt */
+  background-color: #2d2d2d;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+  z-index: 100;
   display: flex;
-  flex-direction: column; /* Buttons und Überschrift untereinander anordnen */
+  flex-direction: column;
+  transition: width 0.3s;
+}
+
+.sidebar.collapsed {
+  width: 80px;
 }
 
 .sidebar-top {
-  background-color: #f0ad4e; /* Gelber Hintergrund für den oberen Teil */
+  display: flex;
+  align-items: center;
+  background-color: #f0ad4e;
   height: 100px;
-  width: 87.5%;
   padding: 20px;
-  border-radius: 0px 0px 5px 5px; 
+  border-radius: 0px 0px 5px 5px;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 32px;
+  cursor: pointer;
+  margin-left: 200px;
+  border-radius: 15px;
+  
 }
 
 .sidebar h1 {
-  font-size: 40px; /* Größe der Überschrift erhöht */
+  font-size: 20px;
+  font-family:'Chakra Petch', sans-serif;
+  font-weight: bold;
   margin-bottom: 20px;
-  margin-left: 15px;
-  color: #f0f2f5; /* Überschrift in Hauptfarbe */
+  color: #f0f2f5;
 }
 
 .sidebar-mid {
-  flex: 1; /* Flexibles Wachstum für den unteren Teil */
+  flex: 1;
   display: flex;
-  flex-direction: column; /* Buttons untereinander anordnen */
-  padding: 30px; /* Abstand zum oberen Teil */
+  flex-direction: column;
+  padding: 30px;
 }
+
 .spacer {
   width: 99%;
 }
 
-.sidebar-bottom{
+.sidebar-bottom {
   height: max-content;
   margin: 20px;
-
 }
 
 .controls button {
@@ -73,21 +102,22 @@ body {
   width: 80%;
   padding: 10px;
   font-size: 16px;
-  background-color: #f0f2f5; /* Hintergrund für die Buttons */
-  color: #1a1a1a; /* Textfarbe für die Buttons */
-  border: 2px solid #f0ad4e; /* Randfarbe für die Buttons */
+  font-family:'Chakra Petch', sans-serif;
+  background-color: #f0f2f5;
+  color: #1a1a1a;
+  border: 2px solid #f0ad4e;
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s, color 0.3s;
 }
 
 .controls button:hover {
-  background-color: #f0ad4e; /* Hintergrundfarbe hover */
-  color: #1a1a1a; /* Textfarbe hover */
+  background-color: #f0ad4e;
+  color: #1a1a1a;
 }
 
 .grid-container {
-  margin-left: 250px; /* Platz für die Sidebar lassen */
+  margin-left: 250px;
   display: grid;
   gap: 15px;
   justify-items: center;
@@ -95,22 +125,27 @@ body {
   border: 1px solid #ddd;
   padding: 20px;
   box-sizing: border-box;
-  width: calc(100vw - 250px); /* Dynamische Breite abzüglich der Sidebar-Breite */
+  width: calc(100vw - 250px);
   max-width: 1200px;
   height: 80vh;
   max-height: 1000px;
-  background-color: #2d2d2d; /* Dunkler Hintergrund für das Grid */
-  color: #f0f2f5; /* Textfarbe für das Grid */
+  background-color: #2d2d2d;
+  color: #f0f2f5;
+}
+
+.grid-container.collapsed {
+  margin-left: 80px;
+  width: calc(100vw - 80px);
 }
 
 .circle {
   border-radius: 50%;
-  border: 2px solid #f0ad4e; /* Randfarbe für den Kreis */
+  border: 2px solid #f0ad4e;
   display: flex;
   justify-content: center;
   align-items: center;
   box-sizing: border-box;
-  background-color: #2d2d2d; /* Hintergrundfarbe für den Kreis */
+  background-color: #2d2d2d;
   transition: transform 0.2s;
 }
 
@@ -121,18 +156,113 @@ body {
 .controls {
   display: flex;
   flex-direction: column;
-  justify-content: center; /* Vertikal zentrieren */
-  align-items: center; /* Horizontal zentrieren */
-  padding: 30px; /* Optional: Padding anpassen */
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
 }
 
 .timestamp-container {
   position: fixed;
   bottom: 10px;
   right: 10px;
-  background-color: #2d2d2d; /* Dunkler Hintergrund für den Timestamp */
-  color: #f0f2f5; /* Textfarbe */
+  background-color: #2d2d2d;
+  color: #f0f2f5;
   padding: 10px;
   border-radius: 5px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Schatten für besseren Kontrast */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
+
+.logo {
+  height: 100px;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.sidebar.collapsed .sidebar-mid,
+.sidebar.collapsed .sidebar-bottom,
+.sidebar.collapsed .spacer,
+/*.sidebar.collapsed .toggle-btn,*/
+.sidebar.collapsed h1
+{
+  display: none;
+}
+.sidebar.collapsed .toggle-btn
+{
+  margin-left: 0;
+}
+
+.sidebar.collapsed .logo {
+  height: 50px;
+  width: 50px;
+  margin-left: -5px;
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.toggle-label {
+  margin-left: 10px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 16px;
+  color: #f0f2f5;
+}
+
+
