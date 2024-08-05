@@ -5,7 +5,10 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
     const totalWidth = gridContainer.clientWidth;
     const totalHeight = gridContainer.clientHeight;
-    const circleSize = Math.min((totalWidth / cols) - 20, (totalHeight / rows) - 20);
+    const circleSize = Math.min((totalWidth / cols) - 30, (totalHeight / rows) - 30);
+    let calibrationIsRunning = false;
+    let fetchDataInterval;
+    let fetchTimestampInterval;
 
     // Initialize circles with correct coordinates starting from 0
     for (let y = 0; y < rows; y++) {
@@ -49,48 +52,114 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
     function fetchData() {
         fetch('/sensor_data')
-            .then(response => response.json())
-            .then(responseData => {
-                const { data, timestamps } = responseData;
-                const circles = document.getElementsByClassName('circle');
-                for (let circle of circles) {
-                    circle.style.backgroundColor = '#2d2d2d';
-                    circle.removeAttribute('title');
+            .then(response => {
+                if (response.status === 423) {
+                    // Wenn der Statuscode 423 ist, mache eine Konsolenausgabe mit dem Inhalt der Antwort
+                    return response.json().then(responseData => {
+                        console.error('Resource is currently locked:', responseData);
+                        // Beende die Funktion ohne weiter zu machen
+                        return;
+                    });
                 }
-
-                data.forEach(item => {
-                    const { x, y, state } = item;
-                    const index = (rows - 1 - y) * cols + x; // Adjusted to start from 0 and flip y-axis
-                    if (circles[index]) {
-                        if (state === 'X') {
-                            circles[index].style.backgroundColor = 'blue';
-                        } else if (state === 'XX') {
-                            circles[index].style.backgroundColor = 'yellow';
-                        } else {
-                            circles[index].style.backgroundColor = '#2b2b2b';
-                        }
-                        if (showDetails) {
-                            circles[index].setAttribute('title', `X: ${x}, Y: ${y}, State: ${state}`);
-                        }
-                    }
-                });
-
-                latestDate = Object.values(timestamps).reduce((latest, current) => {
-                    return new Date(latest) > new Date(current) ? latest : current;
-                }, '');
-
-                timestampContainer.textContent = `MeasurementData Timestamp: ${new Date(latestDate).toLocaleString()}`;
-                updateTimestampStatus();
+    
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+    
+                return response.json();
             })
-            .catch(error => {
-                timestampContainer.style.color = 'red';
-                timestampContainer.innerHTML = 'Connection error &#9888;'; // Adds a warning icon
-            });
+            .then(responseData => {
+                if (responseData === undefined) {
+                    // Falls responseData undefined ist, beende die Funktion
+                    return;
+                }
+    
+                const data = getDataFromResponse(responseData);
+                if (!data) {
+                    console.error('Data is undefined, null, or empty');
+                    return;
+                }
+    
+                resetCircles();
+                updateCirclesWithData(data);
+                updateTimestamp(responseData);
+            })
+            .catch(handleFetchError);
     }
-
+    
+    
+    function getDataFromResponse(responseData) {
+        // Prüfe, ob die Daten direkt in responseData oder unter data enthalten sind
+        const data = responseData.data || responseData;
+        return Object.keys(data).length ? data : null;
+    }
+    
+    function resetCircles() {
+        const circles = document.getElementsByClassName('circle');
+        for (let circle of circles) {
+            circle.style.backgroundColor = '#2d2d2d';
+            circle.removeAttribute('title');
+        }
+    }
+    
+    function updateCirclesWithData(data) {
+        const circles = document.getElementsByClassName('circle');
+        Object.keys(data).forEach(key => {
+            const [x, y] = key.split(',').map(Number);
+            const { State: state } = data[key];
+            //console.log(`Key: ${key}, X: ${x}, Y: ${y}, State: ${state}`);
+    
+            const index = (rows - 1 - y) * cols + x;
+            if (circles[index]) {
+                circles[index].style.backgroundColor = getColorForState(state);
+                if (showDetails) {
+                    circles[index].setAttribute('title', `X: ${x}, Y: ${y}, State: ${state}`);
+                }
+            }
+        });
+    }
+    
+    function getColorForState(state) {
+        switch (state) {
+            case 'X':
+                return 'blue';
+            case 'XX':
+                return 'yellow';
+            default:
+                return '#2b2b2b';
+        }
+    }
+    
+    function updateTimestamp(timestampsData) {
+            latestDate = timestampsData.timestamp
+            
+    
+            timestampContainer.textContent = `MeasurementData Timestamp: ${new Date(latestDate).toLocaleString()}`;
+            updateTimestampStatus();
+        };
+    
+    function handleFetchError(error) {
+        console.error('Fetch error:', error);
+        timestampContainer.style.color = 'red';
+        timestampContainer.innerHTML = 'Connection error &#9888;'; // Fügt ein Warnsymbol hinzu
+    }
+    
+    
+    checkCalibrationStatus();
+    setInterval(checkCalibrationStatus,1000);
     fetchData();
-    setInterval(fetchData, 1000);
-    setInterval(updateTimestampStatus, 1000); // Check delay every second
+    fetchDataInterval = setInterval(fetchData, 1000);
+    fetchTimestampInterval= setInterval(updateTimestampStatus, 1000);
+
+    function stopProcesses(){
+        clearInterval(fetchDataInterval);
+        clearInterval(fetchTimestampInterval);
+        timestampContainer.innerHTML = 'Calibration in progress &#9888;';
+    }
+    function startProcesses(){
+        fetchDataInterval = setInterval(fetchData, 1000);
+        fetchTimestampInterval= setInterval(updateTimestampStatus, 1000);
+    }
 
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('toggle-btn');
@@ -125,4 +194,64 @@ document.addEventListener('DOMContentLoaded', (event) => {
             }
         }
     });
+
+
+    const CalibrateButton = document.getElementById('CalibrateButton')
+    CalibrateButton.addEventListener('click', handleCalibrate)
+
+
+
+
+
+    const calibrateButton = document.getElementById('CalibrateButton');
+    const modal = document.getElementById('calibrationModal');
+    const modalText = document.getElementById('modalText');
+    const finishButton = document.getElementById('finishButton');
+
+    calibrateButton.addEventListener('click', handleCalibrate);
+
+    finishButton.addEventListener('click', () => {
+        startProcesses();
+        modal.style.display = 'none';
+        // Optionally, trigger any actions needed after finishing calibration
+    });
+
+    function handleCalibrate() {
+        stopProcesses();
+        modal.style.display = 'block'; // Show the modal
+
+        fetch('/calibrate')
+            .then(response => response.json())
+            .catch(error => console.error('Error:', error));
+
+        // Optionally, check calibration status immediately
+
+        checkCalibrationStatus();
+    }
+
+    function checkCalibrationStatus() {
+        fetch('/calibration_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'Completed') {
+                    calibrationIsRunning = false;
+                    modalText.textContent = 'Calibration finished. Please continue';
+                    finishButton.style.display = 'block'; // Show the finish button
+                } else if (data.status === 'Not Started') {
+                    calibrationIsRunning = false;
+                    
+                } else {
+                    calibrationIsRunning = true;
+                    modalText.textContent = 'Calibration is running. Please wait';
+                    finishButton.style.display = 'none'; // Hide the finish button
+                    
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    setInterval(checkCalibrationStatus, 1000); // Check every second
+
+    
 });
+

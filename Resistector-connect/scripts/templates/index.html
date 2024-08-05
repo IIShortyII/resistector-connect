@@ -8,6 +8,16 @@
   <title>Resistector UI</title>
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='ResistectorUI.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        fetch('/sensor_data')
+            .then(response => response.json())
+            .then(data => {
+                console.log("Empfangene Daten:", data);
+            })
+            .catch(error => console.error('Error fetching sensor data:', error));
+    });
+</script>
 </head>
 <body>
   <div class="container">
@@ -20,7 +30,7 @@
       <div class="sidebar-mid">
         <div class="controls">
           <button>CONTROL 1</button>
-          <button>Button 2</button>
+          <button id="CalibrateButton"">Calibrate</button>
           <div class="toggle-container">
             <label class="switch">
                 <input type="checkbox" id="toggle-details">
@@ -48,5 +58,12 @@
     const rows = {{ rows }};
   </script>
   <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <div id="calibrationModal" class="modal">
+    <div class="modal-content">
+      <h2 id="modalTitle">Calibration Status</h2>
+      <p id="modalText">Calibration is running. Please wait</p>
+      <button id="finishButton" class="finish-btn" style="display: none;">Finish Calibration</button>
+    </div>
+  </div>
 </body>
 </html>

@@ -2,12 +2,13 @@ import os
 import json
 import logging
 import configparser
-from datetime import datetime
 from flask import Flask, render_template, jsonify
 from flask_cors import CORS
-from collections import defaultdict
 import numpy as np
+from collections import defaultdict, deque
+from datetime import datetime
 
+#TODO: LOGICLAYER IMPLEMENTIEREN!!!
 # Konfigurations- und Log-Pfade relativ zum Skriptverzeichnis
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, 'config.ini')
@@ -31,50 +32,27 @@ logging.info("resistectorUI server session started")
 app = Flask(__name__)
 CORS(app)
 
-# Variable für die Anzahl der Messungen zur Baseline-Berechnung
-AmountMeasurementForBaseline = 50
-meanThreshold = 150
-baseline_logged = False
+mean_values = defaultdict(lambda: defaultdict(lambda: deque(maxlen=50)))
+result_register = {}
+channel_level_register = {}
+previous_display_data = {}
+newestTimestamp = ""
+isCalibrationRunning = False
+calibration_status = {'status': 'Not Started'}
 
 def read_config():
-    """
-    Liest die Konfigurationsdatei und gibt das Konfigurationsobjekt zurück.
-    Returns:
-        configparser.ConfigParser: Das geladene Konfigurationsobjekt.
-    """
     config = configparser.ConfigParser()
     config.read(CONFIG_PATH)
     return config
 
 def clean_value(value):
-    """
-    Bereinigt einen Konfigurationswert, indem Kommentare und überflüssige Leerzeichen entfernt werden.
-    Args:
-        value (str): Der zu bereinigende Wert.
-    Returns:
-        str: Der bereinigte Wert.
-    """
     return value.split(';')[0].split('#')[0].strip()
 
 def get_pi_addresses(config):
-    """
-    Extrahiert die IP-Adressen der Raspberry Pis aus der Konfiguration.
-    Args:
-        config (configparser.ConfigParser): Das Konfigurationsobjekt.
-    Returns:
-        list: Liste der IP-Adressen.
-    """
     raw_addresses = config['Network']['client_ips']
     return [clean_value(addr) for addr in raw_addresses.split(',')]
 
 def get_latest_file():
-    """
-    Ermittelt die neueste Messdatendatei im Datenverzeichnis.
-    Returns:
-        str: Der Pfad zur neuesten Messdatendatei.
-    Raises:
-        FileNotFoundError: Wenn keine Messdatendateien gefunden werden.
-    """
     files = [f for f in os.listdir(DATA_DIR) if f.endswith('_measurementData.json')]
     if not files:
         logging.error(f"No measurement data files found in: {DATA_DIR}")
@@ -83,11 +61,6 @@ def get_latest_file():
     return os.path.join(DATA_DIR, latest_file)
 
 def read_sensor_data():
-    """
-    Liest die Sensordaten aus der neuesten Messdatendatei.
-    Returns:
-        list: Liste der Sensordaten.
-    """
     latest_file = get_latest_file()
     data = []
     with open(latest_file) as f:
@@ -102,97 +75,231 @@ def read_sensor_data():
                     continue
     return data
 
-def calculate_baselines(sensor_data):
-    """
-    Berechnet die Baseline für jeden Kanal und jede Adresse aus den ersten AmountMeasurementForBaseline Messungen.
-    Args:
-        sensor_data (list): Die zu verarbeitenden Sensordaten.
-    Returns:
-        dict: Ein Dictionary mit Baselines für jede Adresse und jeden Kanal.
-    """
-    global baseline_logged
-    baselines = defaultdict(lambda: defaultdict(list))
-    
-    # Sammeln der ersten AmountMeasurementForBaseline Messungen für jede Adresse und jeden Kanal
-    for data in sensor_data:
-        pi_address = data["pi-address"]
-        sensor_values = data["sensor_data"]
+def get_oldest_sensor_data(amountData):
+    data = read_sensor_data()
+    oldest_data = data[:(3*amountData)]
+    return oldest_data
+
+def get_newest_sensor_data(amountData):
+    data = read_sensor_data()
+    new_data = data[-(3*amountData):]
+    loadnewestTimestamp(new_data)
+    return new_data
+
+def loadnewestTimestamp(timeStampdata):
+    global newestTimestamp
+    newestTimestamp = max(timeStampdata, key=lambda x: datetime.fromisoformat(x['timestamp']))['timestamp']
+
+def is_empty(ddict):
+    return len(ddict) == 0
+
+def calculate_means(sensor_data, pi_address=None, channels=None):
+    if pi_address and channels:
+        for channel in channels:
+            channel = "Kanal "+ str(channel)
+            if pi_address in mean_values and channel in mean_values[pi_address]:
+                mean_values[pi_address][channel].clear()
+
+    for entry in sensor_data:
+        entry_pi_address = entry['pi-address']
         
-        if len(baselines[pi_address]['Kanal 0']) < AmountMeasurementForBaseline:
-            for channel, value in sensor_values.items():
-                baselines[pi_address][channel].append(value)
+        if pi_address and entry_pi_address != pi_address:
+            continue
         
-        # Stoppen, wenn genügend Messungen vorliegen
-        if all(len(baselines[pi_address][channel]) >= AmountMeasurementForBaseline for channel in sensor_values.keys()):
-            break
-
-    # Durchschnittswerte für die Baseline berechnen
-    baseline_values = {}
-    for pi_address, channels in baselines.items():
-        baseline_values[pi_address] = {channel: np.mean(values) - meanThreshold for channel, values in channels.items()}
-
-    # Baseline-Werte in den Logs ausgeben, wenn noch nicht geloggt
-    if not baseline_logged:
-        for pi_address, channels in baseline_values.items():
-            logging.info(f"Baseline for {pi_address}:")
-            for channel, baseline in channels.items():
-                logging.info(f"  {channel}: {baseline:.2f}")
-        baseline_logged = True
-
-    return baseline_values
-
-def process_sensor_data(sensor_data, pi_addresses, baselines):
-    """
-    Verarbeitet die Sensordaten und erstellt eine Liste von Zuständen für das Web-UI.
-    Args:
-        sensor_data (list): Die zu verarbeitenden Sensordaten.
-        pi_addresses (list): Liste der IP-Adressen der Raspberry Pis.
-        baselines (dict): Baseline-Werte für jeden Kanal und jede Adresse.
-    Returns:
-        tuple: Ein Tuple mit der Liste der verarbeiteten Daten und den neuesten Zeitstempeln.
-    """
-    config = read_config()
-    threshold_value = 2000
-    max_x_coord = int(clean_value(config['Web-UI']['amountX-Axis']))
-    max_y_coord = int(clean_value(config['Web-UI']['amountY-Axis']))
-
-    pi_data = {pi: {} for pi in pi_addresses}
-    latest_timestamps = {pi: "" for pi in pi_addresses}
-
-    for data in sensor_data:
-        pi_address = data["pi-address"]
-        sensor_data = data["sensor_data"]
-        timestamp = data["timestamp"]
-        pi_data[pi_address] = sensor_data
-        latest_timestamps[pi_address] = timestamp
-
-    result = []
-
-    for x_channel, x_value in pi_data[pi_addresses[0]].items():
-        for y_channel, y_value in pi_data[pi_addresses[1]].items():
-            x_coord = int(x_channel.split()[1])
-            y_coord = int(y_channel.split()[1])
-
-            if x_coord > max_x_coord or y_coord > max_y_coord:
+        for channel, value in entry['sensor_data'].items():
+            if channels and channel not in channels:
                 continue
-
-            state = "O"
-            x_baseline = baselines[pi_addresses[0]].get(x_channel, threshold_value)
-            y_baseline = baselines[pi_addresses[1]].get(y_channel, threshold_value)
             
-            if x_value < x_baseline and y_value < y_baseline:
-                state = "X"
-                if f"Kanal {y_coord}" in pi_data[pi_addresses[2]]:
-                    y_additional_value = pi_data[pi_addresses[2]].get(f"Kanal {y_coord}", threshold_value)
-                    y_additional_baseline = baselines[pi_addresses[2]].get(f"Kanal {y_coord}", threshold_value)
-                    if y_additional_value < y_additional_baseline:
-                        state = "XX"
-            result.append({"x": x_coord, "y": y_coord, "state": state})
+            if entry_pi_address not in mean_values:
+                mean_values[entry_pi_address] = {}
+            if channel not in mean_values[entry_pi_address]:
+                mean_values[entry_pi_address][channel] = []
+            
+            mean_values[entry_pi_address][channel].append(value)
 
-    return result, latest_timestamps
+def get_means():
+    means = {}
+    for pi_address, channels in mean_values.items():
+        means[pi_address] = {channel: np.mean(values) for channel, values in channels.items()}
 
-@app.route('/')
-def index():
+    logging.info(f"Current means: {means}")
+
+    return means
+
+def calculate_SensorData_inMean(means):
+    global result_register
+    global isCalibrationRunning
+    global mean_values
+    config = read_config()
+    threshold = int(clean_value(config['Local-Settings']['threshold']))
+    hystersis_value = int(clean_value(config['Local-Settings']['hysteresis']))
+
+    currentSensordata = get_newest_sensor_data(1)
+
+    for data in currentSensordata:
+        address = data["pi-address"]
+        sensor_data = data["sensor_data"]
+
+        if address in means:
+            if address not in result_register:
+                result_register[address] = {kanal: 0 for kanal in sensor_data.keys()}
+
+            for kanal, value2 in sensor_data.items():
+                value1 = means[address].get(kanal)
+
+                if value1 is not None:
+                    if value1 - threshold > value2:
+                        result_register[address][kanal] -= 1
+                    elif value1 + threshold < value2:
+                        result_register[address][kanal] += 1
+                    else:
+                        result_register[address][kanal] = 0
+
+                if isCalibrationRunning:
+                    if result_register[address][kanal] != 0:
+                        calculate_means(get_newest_sensor_data(5), address, kanal)
+                
+                else:
+                    if result_register[address][kanal] == hystersis_value:
+                        logging.info(f"Drüber {address} {kanal}")
+                        runHystersisCondition(address, kanal, "up")
+                        result_register[address][kanal] = 0
+                    elif result_register[address][kanal] == -hystersis_value:
+                        logging.info(f"Drunter {address} {kanal}")
+                        runHystersisCondition(address, kanal, "down")
+                        result_register[address][kanal] = 0
+    logging.info(f"result_register: {result_register}")
+
+def runHystersisCondition(address, channel, condition):
+    global channel_level_register
+    if address not in channel_level_register:
+        channel_level_register[address] = {}
+    if channel not in channel_level_register[address]:
+        channel_level_register[address][channel] = {"level": 0, "lifetime": 9}
+        
+    if condition == "up":
+        channel_level_register[address][channel]["level"] = +1
+    elif condition == "down":
+        channel_level_register[address][channel]["level"] = -1
+    logging.info(f"channel_level_register: {channel_level_register}")
+    calculate_means(get_newest_sensor_data(5), address, channel)
+
+def checkCalibration():
+    global isCalibrationRunning
+    global result_register
+
+    config = read_config()
+    hystersisCheck =  int(clean_value(config['Local-Settings']['hysteresis']))+2
+    while isCalibrationRunning or hystersisCheck > 0:
+        if not isCalibrationRunning: 
+            hystersisCheck -= 1; 
+        for address, channels in result_register.items():
+            for channel, wert in channels.items():
+                if wert != 0:
+                    logging.info(f"Werte NICHT ok")
+                    isCalibrationRunning = True 
+                    return False
+                else: 
+                    isCalibrationRunning = False  
+    logging.info("Werte ok, Kalibierung ist fertig")
+    return True
+
+
+
+def calibrationRoutine():
+    global isCalibrationRunning 
+    global calibration_status
+    checktheCalibration = False
+    calibration_status = {'status': 'In Progress'}
+
+    if is_empty(mean_values):
+        calculate_means(get_oldest_sensor_data(50))
+    means = get_means()
+    isCalibrationRunning = True
+    calculate_SensorData_inMean(means)
+    while not checktheCalibration:
+        checktheCalibration = checkCalibration()
+        means = get_means()
+        calculate_SensorData_inMean(means)
+
+    logging.info("Kalibrierung Done")
+    calibration_status = {'status': 'Completed'}
+    return True
+
+    
+
+def convertDatatoDisplay():
+    global previous_display_data
+
+    config = read_config()
+    x_dim = int(clean_value(config['Web-UI']['amountX-Axis']))
+    y_dim = int(clean_value(config['Web-UI']['amountY-Axis']))
+
+    displayData = {}
+    for x in range(x_dim):
+        for y in range(y_dim):
+            key = f"{x},{y}"
+            displayData[key] = {'State': 'O'}
+            if key in previous_display_data:
+                displayData[key]['State'] = previous_display_data[key]['State']
+
+    x_coords_negative = set()
+    y_coords_negative = set()
+    x_coords_positive = set()
+    y_coords_positive = set()
+
+    for address, channels in channel_level_register.items():
+        for channel, data in channels.items():
+            level = data["level"]
+            channel_number = int(''.join(filter(str.isdigit, channel)))
+            if level == -1:
+                if address == "10.42.0.1":
+                    x_coords_negative.add(channel_number)
+                elif address == "10.42.0.2":
+                    y_coords_negative.add(channel_number)
+            elif level == +1:
+                if address == "10.42.0.1":
+                    x_coords_positive.add(channel_number)
+                elif address == "10.42.0.2":
+                    y_coords_positive.add(channel_number)
+
+    for x in range(x_dim):
+        for y in range(y_dim):
+            coord_key = f"{x},{y}"
+            if x in x_coords_negative and y in y_coords_negative:
+                displayData[coord_key]['State'] = 'X'
+                channel_level_register['10.42.0.1']["Kanal "+ str(x)]["lifetime"] -= 1
+                channel_level_register['10.42.0.2']["Kanal "+ str(y)]["lifetime"] -= 1
+                deleteLifeTime()
+                logging.info(f"Have one! {coord_key}")
+            elif x in x_coords_positive and y in y_coords_positive and displayData[coord_key]['State'] == 'X':
+                displayData[coord_key]['State'] = 'O'
+                channel_level_register['10.42.0.1']["Kanal "+ str(x)]["lifetime"] -= 1
+                channel_level_register['10.42.0.2']["Kanal "+ str(y)]["lifetime"] -= 1
+                logging.info(f"Lost one! {coord_key}")
+
+    previous_display_data = displayData
+
+    return displayData
+
+def deleteLifeTime():
+    for address in list(channel_level_register.keys()):
+        for channel in list(channel_level_register[address].keys()):
+            if channel_level_register[address][channel]["lifetime"] <= 0:
+                del channel_level_register[address][channel]
+                logging.info(f"Removed {address} {channel} from channel_level_register due to lifetime <= 0")
+        # Lösche die Adresse, wenn keine Kanäle mehr vorhanden sind
+        if not channel_level_register[address]:
+            del channel_level_register[address]
+
+def process_sensor_Data():
+    if is_empty(mean_values):
+        calculate_means(get_oldest_sensor_data(50))
+    means = get_means()
+    calculate_SensorData_inMean(means)
+
+@app.route('/', methods =['GET'])
+def home():
     """
     Rendert die Hauptseite der Webanwendung.
     Returns:
@@ -204,32 +311,31 @@ def index():
     return render_template('index.html', rows=rows, cols=cols)
 
 @app.route('/sensor_data', methods=['GET'])
-def sensor_data():
-    """
-    Liefert die verarbeiteten Sensordaten als JSON.
-    Returns:
-        Response: JSON-Antwort mit den Sensordaten und Zeitstempeln.
-    """
-    try:
-        config = read_config()
-        pi_addresses = get_pi_addresses(config)
-        data = read_sensor_data()
-        baselines = calculate_baselines(data)
-        processed_data, latest_timestamps = process_sensor_data(data, pi_addresses, baselines)
-        return jsonify({"data": processed_data, "timestamps": latest_timestamps})
-    except Exception as e:
-        logging.error(f"Error processing sensor data: {e}", exc_info=True)
-        return jsonify({"error": "Error processing sensor data"}), 500
+def get_sensor_data():
+    global isCalibrationRunning
+
+    if isCalibrationRunning:
+        response = jsonify(message="Kalibierung läuft")
+        response.status_code = 423
+        return response
+    else:
+        process_sensor_Data()
+        data = convertDatatoDisplay()
+        data['timestamp'] = newestTimestamp
+        return jsonify(data)
+
+@app.route('/calibrate', methods=['GET'])
+def startCalibration():
+    calibrationRoutine()
+    return jsonify(message="Kalibrierung gestartet"), 200
+
+@app.route('/calibration_status', methods=['GET'])
+def get_calibration_status():
+    logging.info(f"Calibration Status: {calibration_status}")
+    return jsonify(calibration_status), 200
 
 if __name__ == '__main__':
-    try:
-        config = read_config()
-        ip_address = clean_value(config['Local-Settings']['local_client_ip'])
-        port = int(clean_value(config['Network']['webapp_port']))
-        app.run(host=ip_address, port=port)
-    except KeyError as e:
-        logging.critical(f"Missing configuration: {e}", exc_info=True)
-        exit(1)
-    except Exception as e:
-        logging.critical(f"Unhandled exception: {e}", exc_info=True)
-        exit(1)
+    config = read_config()
+    ip_address = clean_value(config['Local-Settings']['local_client_ip'])
+    port = int(clean_value(config['Network']['webapp_port']))
+    app.run(host=ip_address, port=port)

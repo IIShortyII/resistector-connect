@@ -16,7 +16,8 @@ CONFIG = {
     'plot_interval': 500,
     'figsize': (10, 18),
     'num_subplots': 3,
-    'y_limit': 2200,
+    'y_max': 2200,
+    'y_min': 1800,
     'default_value': 3000  # Standardwert für fehlende Sensordaten
 }
 
@@ -88,7 +89,7 @@ def plot_data(axs, data):
 
     for ax in axs:
         ax.clear()
-        ax.set_ylim(0, CONFIG['y_limit'])
+        ax.set_ylim(CONFIG['y_min'], CONFIG['y_max'])
 
     for i, pi_address in enumerate(unique_addresses):
         df_pi = df[df['pi-address'] == pi_address]
