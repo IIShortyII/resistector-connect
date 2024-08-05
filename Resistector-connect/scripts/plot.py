@@ -13,12 +13,12 @@ CONFIG = {
     'data_dir': 'measurement_data',
     'log_dir': os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs'),
     'log_file': 'plot.log',
-    'plot_interval': 500,
+    'plot_interval': 1,
     'figsize': (10, 18),
     'num_subplots': 3,
-    'y_max': 2200,
-    'y_min': 1800,
-    'default_value': 3000  # Standardwert für fehlende Sensordaten
+    'y_max': 22,
+    'y_min': 19,
+    'default_value': 30  # Standardwert für fehlende Sensordaten
 }
 
 # Logging-Konfiguration

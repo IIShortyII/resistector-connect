@@ -108,6 +108,18 @@ class ADCHandler:
             logging.critical(f"Allgemeiner Fehler bei der ADC-Initialisierung: {e}")
             sys.exit(1)
 
+    def convert_to_float(self, values: List[int]) -> List[float]:
+        """
+        Konvertiert die Rohwerte in Gleitkommazahlen, indem die letzten 6 Ziffern als Dezimalstellen behandelt werden.
+
+        Args:
+            values (List[int]): Die Rohwerte der ADC-Werte.
+
+        Returns:
+            List[float]: Die bereinigten Werte als Gleitkommazahlen.
+        """
+        return [value / 100000000.0 for value in values]
+
     def update_sensor_data(self):
         """
         Aktualisiert die Sensordaten in regelmäßigen Abständen und speichert sie im `data` Dictionary.
@@ -115,8 +127,10 @@ class ADCHandler:
         while True:
             try:
                 adc_values = self.adc.ADS1263_GetAll(self.channel_list)
-                for i, adc_value in enumerate(adc_values):
-                    self.data[f'Kanal {i}'] = int(str(adc_value)[:-6])
+                float_values = self.convert_to_float(adc_values)
+                logging.info(f"Converted ADC values: {float_values}")  # Unskaliert und mit Dezimalstellen
+                for i, adc_value in enumerate(float_values):
+                    self.data[f'Kanal {i}'] = adc_value
                 time.sleep(1)
             except Exception as e:
                 logging.error(f"Fehler beim Aktualisieren der Sensordaten: {e}")

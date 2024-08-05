@@ -131,7 +131,7 @@ def calculate_SensorData_inMean(means):
     global isCalibrationRunning
     global mean_values
     config = read_config()
-    threshold = int(clean_value(config['Local-Settings']['threshold']))
+    threshold = float(clean_value(config['Local-Settings']['threshold']))
     hystersis_value = int(clean_value(config['Local-Settings']['hysteresis']))
 
     currentSensordata = get_newest_sensor_data(1)
@@ -234,6 +234,7 @@ def convertDatatoDisplay():
     config = read_config()
     x_dim = int(clean_value(config['Web-UI']['amountX-Axis']))
     y_dim = int(clean_value(config['Web-UI']['amountY-Axis']))
+    logic_dim = int(clean_value(config['Web-UI']['amountY-Axis']))
 
     displayData = {}
     for x in range(x_dim):
@@ -245,8 +246,12 @@ def convertDatatoDisplay():
 
     x_coords_negative = set()
     y_coords_negative = set()
+    logic_dim_negative= set()
+
     x_coords_positive = set()
     y_coords_positive = set()
+    logic_dim_positive= set()
+
 
     for address, channels in channel_level_register.items():
         for channel, data in channels.items():
@@ -257,11 +262,15 @@ def convertDatatoDisplay():
                     x_coords_negative.add(channel_number)
                 elif address == "10.42.0.2":
                     y_coords_negative.add(channel_number)
+                elif address == "10.42.0.3":
+                    logic_dim_negative.add(channel_number)
             elif level == +1:
                 if address == "10.42.0.1":
                     x_coords_positive.add(channel_number)
                 elif address == "10.42.0.2":
                     y_coords_positive.add(channel_number)
+                elif address == "10.42.0.3":
+                    logic_dim_positive.add(channel_number)
 
     for x in range(x_dim):
         for y in range(y_dim):
@@ -270,6 +279,10 @@ def convertDatatoDisplay():
                 displayData[coord_key]['State'] = 'X'
                 channel_level_register['10.42.0.1']["Kanal "+ str(x)]["lifetime"] -= 1
                 channel_level_register['10.42.0.2']["Kanal "+ str(y)]["lifetime"] -= 1
+                if y in logic_dim_negative: 
+                    displayData[coord_key]['State'] = 'XX'
+                    channel_level_register['10.42.0.3']["Kanal "+ str(y)]["lifetime"] -= 1
+                    logging.info(f"We have a LOGICLAYER!")
                 deleteLifeTime()
                 logging.info(f"Have one! {coord_key}")
             elif x in x_coords_positive and y in y_coords_positive and displayData[coord_key]['State'] == 'X':
