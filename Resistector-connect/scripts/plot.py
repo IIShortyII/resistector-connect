@@ -17,8 +17,10 @@ CONFIG = {
     'figsize': (10, 18),
     'num_subplots': 3,
     'y_max': 22,
-    'y_min': 19,
-    'default_value': 30  # Standardwert für fehlende Sensordaten
+    'y_min': 12,
+    'default_value': 30,  # Standardwert für fehlende Sensordaten
+    'line_colors': ['#377eb8', '#e41a1c', '#4daf4a', '#984ea3', '#a65628', '#f781bf', '#ff7f00', '#00CED1'],  # Farben
+    'line_styles': ['-', '--', ':', '-.', 'solid', 'dashed', 'dashdot', 'dotted']  # Linienstile
 }
 
 # Logging-Konfiguration
@@ -33,16 +35,6 @@ logging.basicConfig(
 )
 
 def load_latest_data(folder_path, last_timestamp=None):
-    """
-    Lädt die neuesten Messdaten aus JSON-Dateien im angegebenen Ordner.
-
-    Args:
-        folder_path (str): Der Pfad zum Ordner, der die JSON-Dateien enthält.
-        last_timestamp (str, optional): Der letzte Zeitstempel, ab dem die Daten geladen werden sollen. Standard ist None.
-
-    Returns:
-        list: Eine Liste der geladenen Datensätze.
-    """
     json_files = glob.glob(os.path.join(folder_path, '*_measurementData.json'))
     
     if not json_files:
@@ -67,16 +59,6 @@ def load_latest_data(folder_path, last_timestamp=None):
     return data
 
 def plot_data(axs, data):
-    """
-    Erstellt initiale Plots mit den bereitgestellten Daten.
-
-    Args:
-        axs (list): Liste der Achsenobjekte für die Subplots.
-        data (list): Die zu plottenden Daten.
-
-    Returns:
-        list: Eine Liste der Linienobjekte, die in den Subplots gezeichnet werden.
-    """
     if not data:
         logging.info("Keine Daten vorhanden.")
         return []
@@ -97,10 +79,12 @@ def plot_data(axs, data):
         axs[i].set_ylabel('Wert')
 
         sensor_data_keys = df_pi['sensor_data'].apply(lambda x: x.keys() if isinstance(x, dict) else {}).explode().unique()
-        for channel in sensor_data_keys:
+        for j, channel in enumerate(sensor_data_keys):
             values = df_pi['sensor_data'].apply(lambda x: x.get(channel, CONFIG['default_value']) if isinstance(x, dict) else CONFIG['default_value']).to_numpy()
             timestamps = df_pi['timestamp'].to_numpy()
-            line, = axs[i].plot(timestamps, values, label=channel)
+            color = CONFIG['line_colors'][j % len(CONFIG['line_colors'])]
+            style = CONFIG['line_styles'][j % len(CONFIG['line_styles'])]
+            line, = axs[i].plot(timestamps, values, label=channel, color=color, linestyle=style)
             lines.append(line)
 
         axs[i].legend(loc='upper left')
@@ -112,19 +96,6 @@ def plot_data(axs, data):
     return lines
 
 def update_plot(frame, folder_path, axs, lines, last_timestamp):
-    """
-    Aktualisiert die Plots mit neuen Daten.
-
-    Args:
-        frame (int): Der aktuelle Frame der Animation.
-        folder_path (str): Der Pfad zum Ordner, der die JSON-Dateien enthält.
-        axs (list): Liste der Achsenobjekte für die Subplots.
-        lines (list): Liste der Linienobjekte, die in den Subplots gezeichnet werden.
-        last_timestamp (str): Der letzte Zeitstempel, bis zu dem die Daten geladen wurden.
-
-    Returns:
-        str: Der neue letzte Zeitstempel nach dem Laden der neuesten Daten.
-    """
     new_data = load_latest_data(folder_path, last_timestamp)
     if not new_data:
         return last_timestamp
@@ -154,9 +125,6 @@ def update_plot(frame, folder_path, axs, lines, last_timestamp):
     return last_timestamp
 
 def main():
-    """
-    Der Hauptteil des Skripts, der die Daten lädt, initiale Plots erstellt und die Animation startet.
-    """
     folder_path = CONFIG['data_dir']
     
     fig, axs = plt.subplots(CONFIG['num_subplots'], 1, figsize=CONFIG['figsize'], sharex=True)

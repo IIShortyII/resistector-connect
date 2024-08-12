@@ -28,15 +28,22 @@
         <img src="{{ url_for('static', filename='ResistectorUI.png') }}" alt="Resistector Logo" class="logo">
       </div>
       <div class="sidebar-mid">
+        <div class="lightbar">
+          <div class="light" id="upper" title="When active NO component should be inserted or removed!">    
+          </div>
+          <div class="light" id="middle" title="When active, system is calculting. Unsave inseration, could result in incorrect data!">    
+          </div>
+          <div class="light" id="lower" title="Inserting or removing component is save.">    
+          </div>
+        </div>
         <div class="controls">
-          <button>CONTROL 1</button>
-          <button id="CalibrateButton"">Calibrate</button>
+          <button id="CalibrateButton"">Start Calibration</button>
           <div class="toggle-container">
             <label class="switch">
                 <input type="checkbox" id="toggle-details">
                 <span class="slider round"></span>
             </label>
-            <span class="toggle-label">Show Measurement Point Details</span>
+            <span class="toggle-label">Show Grid Details</span>
         </div>        
         </div>
       </div>

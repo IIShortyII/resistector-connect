@@ -10,6 +10,10 @@ document.addEventListener('DOMContentLoaded', (event) => {
     let fetchDataInterval;
     let fetchTimestampInterval;
 
+    const upperlight = document.getElementById('upper');
+    const middlelight = document.getElementById('middle');
+    const lowerlight = document.getElementById('lower');
+
     // Initialize circles with correct coordinates starting from 0
     for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
@@ -49,7 +53,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
             timestampContainer.innerHTML = 'No data received &#9888;'; // Adds a warning icon
         }
     }
-
     function fetchData() {
         fetch('/sensor_data')
             .then(response => {
@@ -63,7 +66,17 @@ document.addEventListener('DOMContentLoaded', (event) => {
                 }
     
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    // Lies den Body einmal und werte ihn aus
+                    return response.text().then(text => {
+                        try {
+                            // Versuche, die Antwort als JSON zu parsen
+                            const json = JSON.parse(text);
+                            throw new Error('Network response was not ok. Response: ' + JSON.stringify(json));
+                        } catch (e) {
+                            // Wenn es kein gültiges JSON ist, zeige den Text an
+                            throw new Error('Network response was not ok. Response: ' + text);
+                        }
+                    });
                 }
     
                 return response.json();
@@ -82,10 +95,18 @@ document.addEventListener('DOMContentLoaded', (event) => {
     
                 resetCircles();
                 updateCirclesWithData(data);
+                console.log("Daten erhalten: ",responseData)
                 updateTimestamp(responseData);
+                updateSystemState(responseData);
+
             })
             .catch(handleFetchError);
     }
+    
+    function handleFetchError(error) {
+        console.error('Fetch error:', error);
+    }
+    
     
     
     function getDataFromResponse(responseData) {
@@ -103,12 +124,15 @@ document.addEventListener('DOMContentLoaded', (event) => {
     }
     
     function updateCirclesWithData(data) {
-        const circles = document.getElementsByClassName('circle');
-        Object.keys(data).forEach(key => {
-            const [x, y] = key.split(',').map(Number);
-            const { State: state } = data[key];
-            //console.log(`Key: ${key}, X: ${x}, Y: ${y}, State: ${state}`);
+        const displayData = data.displayData;
+        const components = data.components;
     
+        const circles = document.getElementsByClassName('circle');
+    
+        Object.keys(displayData).forEach(key => {
+            const [x, y] = key.split(',').map(Number);
+            const { State: state } = displayData[key];
+           
             const index = (rows - 1 - y) * cols + x;
             if (circles[index]) {
                 circles[index].style.backgroundColor = getColorForState(state);
@@ -117,7 +141,60 @@ document.addEventListener('DOMContentLoaded', (event) => {
                 }
             }
         });
+    
+        const componentImages = document.getElementsByClassName('component');
+        while (componentImages[0]) {
+            componentImages[0].parentNode.removeChild(componentImages[0]);
+        }
+        
+        components.forEach(component => {
+            const img = document.createElement('img');
+            img.src = `static/Bauteilbilder/${component.type}.png`;
+            img.className = 'component';
+            img.style.position = 'absolute';
+            if (component.orientation === 'horizontal'){
+                if (component.type === 'LED' || component.type === 'Resistor'){   
+                    circleLocation = getCirclePosition((component.x -1), component.y);                 
+                    img.style.left = `${circleLocation.left}px`;
+                    //img.style.left = `0px`;
+                }else {
+                    circleLocation = getCirclePosition((component.x -2), component.y);
+                    img.style.left = `${circleLocation.left}px`;
+                }
+                img.style.top = `${circleLocation.top}px`;
+                img.style.width = `${circleSize*2.7}px`;
+                img.style.height = `${circleSize*1.2}px`;
+            }
+            if (component.orientation === 'vertical'){
+                circleLocation = getCirclePosition((component.x), component.y);
+                img.style.left = `${circleLocation.left-(circleSize/2.75*2)}px`;
+                img.style.top = `${circleLocation.top+(circleSize/3*2)-10}px`;
+                img.style.width = `${circleSize*2.5}px`;
+                img.style.height = `${circleSize*1.2}px`;
+            }
+            img.style.transform = component.orientation === 'horizontal' ? 'rotate(0deg)' : 'rotate(90deg)';
+    
+            gridContainer.appendChild(img);
+        });
     }
+
+    function getCirclePosition(x_cor, y_cor) {
+        x = x_cor;
+        y = rows - y_cor-1;
+        const circle = document.querySelector(`.circle[data-x='${x}'][data-y='${y}']`);
+        if (circle) {
+            const rect = circle.getBoundingClientRect();
+            console.debug(`Position of circle at (${x_cor}/${y_cor} (${rect.top}/${rect.left})`);
+            return {
+                top: rect.top,
+                left: rect.left,
+            }
+        } else {
+            console.error(`Circle at (${x_cor}, ${y_cor}) not found.`);
+        }
+    }
+    
+
     
     function getColorForState(state) {
         switch (state) {
@@ -137,6 +214,25 @@ document.addEventListener('DOMContentLoaded', (event) => {
             timestampContainer.textContent = `MeasurementData Timestamp: ${new Date(latestDate).toLocaleString()}`;
             updateTimestampStatus();
         };
+    
+    function updateSystemState(SystemStateData){
+        systemState = SystemStateData.SystemState
+        if (systemState == 'Red'){
+            upperlight.style.background = 'red'; 
+            middlelight.style.background = '#242323';
+            lowerlight.style.background = '#242323';
+        }
+        if (systemState == 'Yellow'){
+            upperlight.style.background = '#242323';
+            middlelight.style.background = 'Yellow';
+            lowerlight.style.background = '#242323';
+        }
+        if (systemState == 'Green'){
+            upperlight.style.background = '#242323';
+            middlelight.style.background = '#242323';
+            lowerlight.style.background = 'Green';
+        }
+    }
     
     function handleFetchError(error) {
         console.error('Fetch error:', error);

@@ -1,0 +1,22 @@
+O = Non-Conductive
+X = Conductive
+
+LED:
+    Distance: 2
+    LogicLayer: OO
+    Breadboard: XX
+
+Resistor:
+    Distance: 2
+    LogicLayer: XX
+    Breadboard: XX
+
+Cable:
+    Distance: 3
+    LogicLayer: OOO
+    Breadboard: XXX
+
+Transistor:
+    Distance: 3
+    LogicLayer: OXO
+    Breadboard: XXX
