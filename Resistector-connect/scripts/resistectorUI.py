@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import configparser
+import uuid
+import copy
 import numpy as np
 from collections import defaultdict, deque
 from datetime import datetime
@@ -37,7 +39,7 @@ class Logger:
         os.makedirs(log_dir, exist_ok=True)
         self.log_file = os.path.join(log_dir, log_file)
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[logging.FileHandler(self.log_file)]
         )
@@ -50,6 +52,10 @@ class Logger:
     @staticmethod
     def error(message):
         logging.error(message)
+
+    @staticmethod
+    def debug(message):
+        logging.debug(message)
 
 
 class SensorDataManager:
@@ -275,10 +281,11 @@ class CalibrationManager:
 
 class DisplayDataManager:
     """Verwaltet die Anzeige- und Komponentenerkennungslogik."""
-    
+
     def __init__(self, sensor_manager):
         self.sensor_manager = sensor_manager
-    
+        self.old_detected_components = {}
+
     def convert_data_to_display(self):
         """Konvertiert Sensordaten in ein Anzeigeformat."""
         config = ConfigManager(CONFIG_PATH)
@@ -292,17 +299,21 @@ class DisplayDataManager:
                 if key in self.sensor_manager.previous_display_data:
                     self.sensor_manager.display_data[key]['State'] = self.sensor_manager.previous_display_data[key]['State']
 
-        self.detect_component_levels(x_dim, y_dim)
+        self.detect_component_levels(x_dim, y_dim) # ist es X, XX oder O -> Es kommt ein DisplayData Datensatz raus
         self.sensor_manager.previous_display_data = self.sensor_manager.display_data.copy()
-        detected_components = self.detect_components(x_dim, y_dim)
-        self.delete_lifetime()
+
         
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        detected_components = self.detect_components(x_dim, y_dim)
+        self.old_detected_components = copy.deepcopy(detected_components)
+        self.delete_lifetime()
+
         return {
             'displayData': self.sensor_manager.display_data,
             'components': detected_components,
             'timestamp': self.sensor_manager.newest_timestamp
         }
-    
+
     def detect_component_levels(self, x_dim, y_dim):
         """Ermittelt die Zustände der verschiedenen Komponenten auf der Anzeige."""
         x_coords_negative, y_coords_negative, logic_dim_negative = set(), set(), set()
@@ -352,46 +363,112 @@ class DisplayDataManager:
                         self.sensor_manager.display_data[coord_key]['State'] = logic_state
                         Logger.info(f"Logical layer detected at {coord_key}")
 
+
+
+
+
+
     def detect_components(self, x_dim, y_dim):
         """Erkennt Komponenten auf der Anzeige basierend auf bekannten Mustern."""
         component_patterns = {
-            'LED': [('X', 'X')],
+            'Transistor': [('X', 'XX', 'X')],
             'Resistor': [('XX', 'XX')],
             'Cable': [('X', 'X', 'X')],
-            'Transistor': [('X', 'XX', 'X')]
+            'LED': [('X', 'X')]
         }
 
-        detected_components = []
+        occupied_coords = set()
+
+        self.check_old_grid(occupied_coords)
+        detected_components = copy.deepcopy(self.old_detected_components)
+        
+        
+
+        for comp in detected_components.values():
+            occupied_coords.update(comp['coordinates'])
 
         for x in range(x_dim):
             for y in range(y_dim):
-                for component, pattern in component_patterns.items():
-                    self._detect_component(x, y, x_dim, y_dim, component, pattern, detected_components)
+                if not self.is_coord_occupied(detected_components, x, y):
+                    for component, pattern in component_patterns.items():
+                        self._detect_component(x, y, x_dim, y_dim, component, pattern, detected_components, occupied_coords)
 
         return detected_components
 
-    def _detect_component(self, x, y, x_dim, y_dim, component, pattern, detected_components):
+    def _detect_component(self, x, y, x_dim, y_dim, component, pattern, detected_components, occupied_coords):
         """Prüft, ob ein bestimmtes Komponenten-Muster an der Position vorhanden ist."""
         pattern_length = len(pattern[0])
+
+        # Check horizontal pattern
         if x + pattern_length - 1 < x_dim:
             if all(self.sensor_manager.display_data.get(f"{x + i},{y}", {}).get('State') == pattern[0][i]
-                   for i in range(pattern_length)):
-                detected_components.append({
+                   and (x + i, y) not in occupied_coords for i in range(pattern_length)):
+                comp_id = str(uuid.uuid4())
+                coordinates = [(x + i, y) for i in range(pattern_length)]
+                detected_components[comp_id] = {
                     'type': component,
                     'x': x + pattern_length // 2,
                     'y': y,
-                    'orientation': 'horizontal'
-                })
+                    'orientation': 'horizontal',
+                    'coordinates': coordinates
+                }
+                occupied_coords.update(coordinates)  # Mark these coordinates as occupied
 
+        # Check vertical pattern
         if y + pattern_length - 1 < y_dim:
             if all(self.sensor_manager.display_data.get(f"{x},{y + i}", {}).get('State') == pattern[0][i]
-                   for i in range(pattern_length)):
-                detected_components.append({
+                   and (x, y + i) not in occupied_coords for i in range(pattern_length)):
+                comp_id = str(uuid.uuid4())
+                coordinates = [(x, y + i) for i in range(pattern_length)]
+                detected_components[comp_id] = {
                     'type': component,
                     'x': x,
                     'y': y + pattern_length // 2,
-                    'orientation': 'vertical'
-                })
+                    'orientation': 'vertical',
+                    'coordinates': coordinates
+                }
+                occupied_coords.update(coordinates)  # Mark these coordinates as occupied
+
+
+    def check_old_grid(self, occupied_coords):
+        display_data = self.sensor_manager.display_data
+        old_grid_data = self.old_detected_components
+
+        removed_Components_id = []
+
+        if old_grid_data:
+            for id, component_detail in old_grid_data.items():
+                still_existing_component = True
+                for x, y in component_detail['coordinates']:
+                    coord_key = f"{x},{y}"
+                    state = display_data.get(coord_key, {}).get('State')
+                    if state not in ['X', 'XX']:
+                        still_existing_component = False
+                        occupied_coords.discard((x,y))
+                        break
+                if not still_existing_component:
+                    removed_Components_id.append(id)
+            for id in removed_Components_id:
+                del old_grid_data[id]
+
+                Logger.info(f"Removed component with UUID {id} from old components because it was removed from user.")
+        else:
+            Logger.info(f"No old Component Grid Data available. It is empty.")
+                    
+    def is_coord_occupied(self, components_dict, x, y):
+        for component in components_dict.values():
+            # Überprüfe, ob 'coordinates' im aktuellen Eintrag vorhanden ist
+            if 'coordinates' in component:
+             # Überprüfe, ob das Koordinatenpaar (x, y) in 'coordinates' enthalten ist
+                if (x, y) in component['coordinates']:
+                 return True
+        return False
+
+
+
+
+
+
 
     def delete_lifetime(self):
         """Reduziert die Lebensdauer der Kanäle im Kanalregister und entfernt abgelaufene Einträge."""

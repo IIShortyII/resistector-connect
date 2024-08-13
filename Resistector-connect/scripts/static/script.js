@@ -147,7 +147,8 @@ document.addEventListener('DOMContentLoaded', (event) => {
             componentImages[0].parentNode.removeChild(componentImages[0]);
         }
         
-        components.forEach(component => {
+        Object.keys(components).forEach(key => {
+            const component = components[key];
             const img = document.createElement('img');
             img.src = `static/Bauteilbilder/${component.type}.png`;
             img.className = 'component';

@@ -11,3 +11,4 @@ scripts/archiv/
 
 scripts/tmp/*
 !scripts/tmp/
+Resistector-connect/20240807081619_measurementData.json
