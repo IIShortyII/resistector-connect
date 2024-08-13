@@ -88,17 +88,68 @@ def apply_ema_filter(data_points, alpha=0.1):
         ema = alpha * point + (1 - alpha) * ema
     return ema
 
+def apply_threshold_filter(value, previous_value, total_min, total_max, min_threshold, max_threshold):
+    """
+    Wendet den Schwellwertfilter auf den Wert an.
+
+    Args:
+        value (float): Der aktuelle Messwert.
+        previous_value (float): Der vorherige gefilterte Wert.
+        total_min (float): Das totale Minimum.
+        total_max (float): Das totale Maximum.
+        min_threshold (float): Das Schwellwertminimum.
+        max_threshold (float): Das Schwellwertmaximum.
+
+    Returns:
+        float: Der gefilterte Wert.
+    """
+    
+    #ignore too high or too low values
+    if value < total_min or value > total_max:
+        return previous_value
+
+    delta = value - previous_value
+    if delta > max_threshold:
+        return previous_value + max_threshold
+    if delta < -min_threshold:
+        return previous_value - min_threshold
+    return value
+
 # Globales Dictionary zum Speichern der letzten Datenpunkte für jede Adresse und jeden Kanal
-recent_data = defaultdict(lambda: defaultdict(deque))
+ema_recent_data = defaultdict(lambda: defaultdict(deque))
+thres_recent_data = defaultdict(lambda: defaultdict(deque))
 
 def filter_data(pi, data, alpha=0.1):
-    filtered_data = {}
+    ema_filtered_data = {}
+    thres_filtered_data = {}
+    
     for channel, value in data.items():
-        # Fügt den neuen Wert zu den letzten Datenpunkten hinzu
-        recent_data[pi][channel].append(value)
-        # Wendet den EMA-Filter an
-        filtered_data[channel] = apply_ema_filter(list(recent_data[pi][channel]), alpha)
-    return filtered_data
+        # Fügt den neuen Wert zu den letzten Datenpunkten hinzu und wendet den EMA-Filter an
+        ema_recent_data[pi][channel].append(value)
+        ema_filtered_value = apply_ema_filter(list(ema_recent_data[pi][channel]), alpha)
+        ema_filtered_data[channel] = ema_filtered_value
+        
+        # Optional: Größe der Deque beschränken
+        if len(ema_recent_data[pi][channel]) > 10:
+            ema_recent_data[pi][channel].popleft()
+
+        # Wenn die Pi-Adresse in den speziellen Adressen enthalten ist, Threshold-Filter anwenden
+        if pi in ["10.42.0.2", "10.42.0.3"]:
+            previous_value = thres_recent_data[pi][channel][-1] if thres_recent_data[pi][channel] else ema_filtered_value
+            thres_filtered_value = apply_threshold_filter(ema_filtered_value, previous_value, 10, 22, 0.5, 0.5)
+            thres_filtered_data[channel] = thres_filtered_value
+            
+            # Gefilterten Wert zur Deque hinzufügen
+            thres_recent_data[pi][channel].append(thres_filtered_value)
+            if len(thres_recent_data[pi][channel]) > 10:
+                thres_recent_data[pi][channel].popleft()
+
+    # Wenn ein Threshold-Filter angewendet wurde, diese gefilterten Daten zurückgeben, sonst die EMA-gefilterten Daten
+    if thres_filtered_data:
+        return thres_filtered_data
+    else:
+        return ema_filtered_data
+
 
 def main():
     config = read_config(CONFIG_PATH)
