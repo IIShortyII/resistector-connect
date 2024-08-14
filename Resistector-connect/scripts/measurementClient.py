@@ -7,13 +7,13 @@ from typing import List, Dict, Any
 from flask import Flask, jsonify
 import configparser
 
-# Pfad zur Konfigurationsdatei und Logdatei
+# Path to the configuration file and log file
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, 'config.ini')
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 LOG_FILE = os.path.join(LOG_DIR, 'Client.log')
 
-# Logging-Konfiguration
+# Logging configuration
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
@@ -23,33 +23,37 @@ logging.basicConfig(
     handlers=[logging.FileHandler(LOG_FILE)]
 )
 
-# Pfad zum ADC-Modul hinzufügen
+#Supress Flask Logging below Error
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+# Add the path to the ADC module
 sys.path.append(os.path.join(os.path.dirname(__file__), 'ADC'))
 from ADC import ADS1263
 
 
 class ConfigLoader:
     """
-    Eine Hilfsklasse zum Laden und Bereinigen von Konfigurationswerten.
+    A helper class for loading and cleaning configuration values.
 
-    Methoden:
+    Methods:
         load_config(config_path: str) -> configparser.ConfigParser:
-            Lädt die Konfiguration aus einer Datei.
+            Loads the configuration from a file.
 
         clean_value(value: str) -> str:
-            Bereinigt einen Konfigurationswert, indem Kommentare und überflüssige Leerzeichen entfernt werden.
+            Cleans a configuration value by removing comments and extra whitespace.
     """
 
     @staticmethod
     def load_config(config_path: str) -> configparser.ConfigParser:
         """
-        Lädt die Konfiguration aus der angegebenen Datei.
+        Loads the configuration from the specified file.
 
         Args:
-            config_path (str): Pfad zur Konfigurationsdatei.
+            config_path (str): Path to the configuration file.
 
         Returns:
-            configparser.ConfigParser: Das geladene Konfigurationsobjekt.
+            configparser.ConfigParser: The loaded configuration object.
         """
         config = configparser.ConfigParser()
         config.read(config_path)
@@ -58,124 +62,124 @@ class ConfigLoader:
     @staticmethod
     def clean_value(value: str) -> str:
         """
-        Bereinigt einen Konfigurationswert, indem Kommentare und überflüssige Leerzeichen entfernt werden.
+        Cleans a configuration value by removing comments and extra whitespace.
 
         Args:
-            value (str): Der zu bereinigende Wert.
+            value (str): The value to be cleaned.
 
         Returns:
-            str: Der bereinigte Wert.
+            str: The cleaned value.
         """
         return value.split(';')[0].split('#')[0].strip()
 
 
 class ADCHandler:
     """
-    Eine Klasse zur Handhabung des ADC (Analog-Digital-Converter).
+    A class for handling the ADC (Analog-to-Digital Converter).
 
-    Attribute:
-        channel_list (List[int]): Liste der zu scannenden Kanäle.
-        data (Dict[str, Any]): Ein Dictionary zur Speicherung der Sensordaten.
+    Attributes:
+        channel_list (List[int]): List of channels to scan.
+        data (Dict[str, Any]): A dictionary for storing sensor data.
 
-    Methoden:
+    Methods:
         update_sensor_data():
-            Aktualisiert die Sensordaten in regelmäßigen Abständen.
+            Updates the sensor data at regular intervals.
 
         get_data() -> Dict[str, Any]:
-            Gibt die aktuellen Sensordaten zurück.
+            Returns the current sensor data.
     """
 
     def __init__(self, scan_frequence: str, channel_list: List[int]):
         """
-        Initialisiert den ADCHandler mit der angegebenen Scan-Frequenz und Kanal-Liste.
+        Initializes the ADCHandler with the given scan frequency and channel list.
 
         Args:
-            scan_frequence (str): Die Scan-Frequenz für den ADC.
-            channel_list (List[int]): Liste der zu scannenden Kanäle.
+            scan_frequence (str): The scan frequency for the ADC.
+            channel_list (List[int]): List of channels to scan.
         """
         self.channel_list = channel_list
         self.data = {}
         try:
             self.adc = ADS1263.ADS1263()
             if self.adc.ADS1263_init_ADC1(scan_frequence) == -1:
-                logging.critical("Fehler bei der Initialisierung des ADC.")
+                logging.critical("Error initializing ADC.")
                 sys.exit(1)
             self.adc.ADS1263_SetMode(0)
         except IOError as e:
-            logging.critical(f"IOError bei der ADC-Initialisierung: {e}")
+            logging.critical(f"IOError during ADC initialization: {e}")
             sys.exit(1)
         except Exception as e:
-            logging.critical(f"Allgemeiner Fehler bei der ADC-Initialisierung: {e}")
+            logging.critical(f"General error during ADC initialization: {e}")
             sys.exit(1)
 
     def convert_to_float(self, values: List[int]) -> List[float]:
         """
-        Konvertiert die Rohwerte in Gleitkommazahlen, indem die letzten 6 Ziffern als Dezimalstellen behandelt werden.
+        Converts raw values to floating-point numbers by treating the last 6 digits as decimal places.
 
         Args:
-            values (List[int]): Die Rohwerte der ADC-Werte.
+            values (List[int]): The raw ADC values.
 
         Returns:
-            List[float]: Die bereinigten Werte als Gleitkommazahlen.
+            List[float]: The cleaned values as floating-point numbers.
         """
         return [value / 100000000.0 for value in values]
 
     def update_sensor_data(self):
         """
-        Aktualisiert die Sensordaten in regelmäßigen Abständen und speichert sie im `data` Dictionary.
+        Updates the sensor data at regular intervals and stores it in the `data` dictionary.
         """
         while True:
             try:
                 adc_values = self.adc.ADS1263_GetAll(self.channel_list)
                 float_values = self.convert_to_float(adc_values)
-                logging.info(f"Converted ADC values: {float_values}")  # Unskaliert und mit Dezimalstellen
+                logging.debug(f"Converted ADC values: {float_values}")  
                 for i, adc_value in enumerate(float_values):
-                    self.data[f'Kanal {i}'] = adc_value
+                    self.data[f'Channel {i}'] = adc_value
                 time.sleep(1)
             except Exception as e:
-                logging.error(f"Fehler beim Aktualisieren der Sensordaten: {e}")
+                logging.error(f"Error updating sensor data: {e}")
 
     def get_data(self) -> Dict[str, Any]:
         """
-        Gibt die aktuellen Sensordaten zurück.
+        Returns the current sensor data.
 
         Returns:
-            Dict[str, Any]: Ein Dictionary mit den aktuellen Sensordaten.
+            Dict[str, Any]: A dictionary with the current sensor data.
         """
         return self.data
 
 
 def create_app(adc_handler: ADCHandler, channel_list: List[int], level: str) -> Flask:
     """
-    Erstellt und konfiguriert die Flask-Anwendung.
+    Creates and configures the Flask application.
 
     Args:
-        adc_handler (ADCHandler): Der ADCHandler zur Handhabung der Sensordaten.
-        channel_list (List[int]): Liste der zu scannenden Kanäle.
-        level (str): Der Level-String für die Anwendung.
+        adc_handler (ADCHandler): The ADCHandler for handling sensor data.
+        channel_list (List[int]): List of channels to scan.
+        level (str): The level string for the application.
 
     Returns:
-        Flask: Die konfigurierte Flask-Anwendung.
+        Flask: The configured Flask application.
     """
     app = Flask(__name__)
 
     @app.route('/measure', methods=['GET'])
     def measure():
         """
-        Flask-Route für die Messung. Gibt die aktuellen Sensordaten zurück.
+        Flask route for measurement. Returns the current sensor data.
 
         Returns:
-            Flask.Response: Eine JSON-Antwort mit den aktuellen Sensordaten.
+            Flask.Response: A JSON response with the current sensor data.
         """
         return jsonify(adc_handler.get_data())
 
-    @app.route('/modus', methods=['GET'])
-    def modus():
+    @app.route('/mode', methods=['GET'])
+    def mode():
         """
-        Flask-Route für den Modus. Gibt die Anzahl der Kanäle und das Level zurück.
+        Flask route for mode. Returns the number of channels and the level.
 
         Returns:
-            Flask.Response: Eine JSON-Antwort mit der Anzahl der Kanäle und dem Level.
+            Flask.Response: A JSON response with the number of channels and the level.
         """
         return jsonify({
             'channelCount': len(channel_list),
@@ -187,8 +191,8 @@ def create_app(adc_handler: ADCHandler, channel_list: List[int], level: str) -> 
 
 def main():
     """
-    Hauptfunktion der Anwendung. Lädt die Konfiguration, initialisiert den ADCHandler,
-    startet den Thread zur Aktualisierung der Sensordaten und die Flask-Anwendung.
+    Main function of the application. Loads the configuration, initializes the ADCHandler,
+    starts the thread for updating sensor data, and starts the Flask application.
     """
     try:
         config = ConfigLoader.load_config(CONFIG_PATH)
@@ -199,19 +203,19 @@ def main():
         ip_address = ConfigLoader.clean_value(config['Local-Settings']['local_client_ip'])
         port = int(ConfigLoader.clean_value(config['Network']['client_port']))
 
-        logging.info("Initialisierung des ADC...")
+        logging.info("Initializing ADC...")
         adc_handler = ADCHandler(scan_frequence, channel_list)
 
-        logging.info("Starten des Threads zur Aktualisierung der Sensordaten...")
+        logging.debug("Starting thread for updating sensor data...")
         threading.Thread(target=adc_handler.update_sensor_data, daemon=True).start()
 
-        logging.info("Starten der Flask-Anwendung...")
+        logging.debug("Starting Flask application...")
         app = create_app(adc_handler, channel_list, level)
         app.run(host=ip_address, port=port)
     except Exception as e:
-        logging.critical(f"Unbehandelte Ausnahme: {e}", exc_info=True)
+        logging.critical(f"Unhandled exception: {e}", exc_info=True)
     except KeyboardInterrupt:
-        logging.info("Programm beendet.")
+        logging.error("Program terminated.")
         sys.exit(0)
 
 

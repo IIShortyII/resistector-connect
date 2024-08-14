@@ -12,7 +12,7 @@ from flask_cors import CORS
 
 
 class ConfigManager:
-    """Verwaltet das Lesen und Bereinigen der Konfigurationsdaten."""
+    """Manages reading and cleaning configuration data."""
     
     def __init__(self, config_path):
         self.config = configparser.ConfigParser()
@@ -28,22 +28,23 @@ class ConfigManager:
     
     @staticmethod
     def clean_value(value):
-        """Bereinigt den Wert von Kommentaren und Leerzeichen."""
+        """Cleans the value of comments and whitespace."""
         return value.split(';')[0].split('#')[0].strip()
 
 
 class Logger:
-    """Verantwortlich für das Setup und das Logging von Nachrichten."""
+    """Responsible for setting up and logging messages."""
     
     def __init__(self, log_dir, log_file):
         os.makedirs(log_dir, exist_ok=True)
         self.log_file = os.path.join(log_dir, log_file)
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[logging.FileHandler(self.log_file)]
         )
         self.info("resistectorUI server session started")
+        self.configure_werkzeug_logging()
     
     @staticmethod
     def info(message):
@@ -57,9 +58,14 @@ class Logger:
     def debug(message):
         logging.debug(message)
 
+    @staticmethod
+    def configure_werkzeug_logging():
+        """Configures Werkzeug logging to suppress GET request logs."""
+        werkzeug_logger = logging.getLogger('werkzeug')
+        werkzeug_logger.setLevel(logging.ERROR)  # Only log errors from Werkzeug
 
 class SensorDataManager:
-    """Verwaltet das Laden, Verarbeiten und Speichern von Sensordaten."""
+    """Manages loading, processing, and storing sensor data."""
     
     def __init__(self, data_dir):
         self.data_dir = data_dir
@@ -71,7 +77,7 @@ class SensorDataManager:
         self.newest_timestamp = ""
     
     def get_latest_file(self):
-        """Findet die neueste Messdatei im Datenverzeichnis."""
+        """Finds the latest measurement file in the data directory."""
         files = [f for f in os.listdir(self.data_dir) if f.endswith('_measurementData.json')]
         if not files:
             Logger.error(f"No measurement data files found in: {self.data_dir}")
@@ -80,7 +86,7 @@ class SensorDataManager:
         return os.path.join(self.data_dir, latest_file)
     
     def read_sensor_data(self):
-        """Liest die neuesten Sensordaten aus der JSON-Datei."""
+        """Reads the latest sensor data from the JSON file."""
         latest_file = self.get_latest_file()
         data = []
         with open(latest_file) as f:
@@ -96,23 +102,23 @@ class SensorDataManager:
         return data
     
     def get_oldest_sensor_data(self, amount):
-        """Liefert die ältesten Sensordaten."""
+        """Returns the oldest sensor data."""
         data = self.read_sensor_data()
         return data[:3 * amount]
     
     def get_newest_sensor_data(self, amount):
-        """Liefert die neuesten Sensordaten."""
+        """Returns the newest sensor data."""
         data = self.read_sensor_data()
         new_data = data[-3 * amount:]
         self.update_newest_timestamp(new_data)
         return new_data
     
     def update_newest_timestamp(self, timestamp_data):
-        """Aktualisiert den neuesten Zeitstempel basierend auf den Sensordaten."""
+        """Updates the newest timestamp based on the sensor data."""
         self.newest_timestamp = max(timestamp_data, key=lambda x: datetime.fromisoformat(x['timestamp']))['timestamp']
     
     def calculate_means(self, sensor_data, pi_address=None, channels=None):
-        """Berechnet die Mittelwerte der Sensordaten."""
+        """Calculates the means of the sensor data."""
         if pi_address and channels:
             for channel in channels:
                 channel = f"Kanal {channel}"
@@ -130,7 +136,7 @@ class SensorDataManager:
                 self.mean_values[entry_pi_address][channel].append(value)
     
     def get_means(self):
-        """Gibt die berechneten Mittelwerte zurück."""
+        """Returns the calculated means."""
         means = {}
         for pi_address, channels in self.mean_values.items():
             means[pi_address] = {}
@@ -143,21 +149,21 @@ class SensorDataManager:
 
     
     def process_sensor_data(self):
-        """Verarbeitet die Sensordaten, indem Mittelwerte berechnet und Zustände aktualisiert werden."""
+        """Processes the sensor data by calculating means and updating states."""
         if not self.mean_values:
             self.calculate_means(self.get_oldest_sensor_data(50))
         means = self.get_means()
         self.calculate_sensor_data_in_mean(means)
     
     def calculate_sensor_data_in_mean(self, means):
-        """Vergleicht Sensordaten mit den Mittelwerten und aktualisiert das Ergebnisregister."""
+        """Compares sensor data with the means and updates the result register."""
         config = ConfigManager(CONFIG_PATH)
         threshold = config.get_value('Local-Settings', 'threshold', is_float=True)
         hysteresis_value = config.get_value('Local-Settings', 'hysteresis', is_int=True)
 
         current_sensor_data = self.get_newest_sensor_data(1)
-        Logger.info(f"Current means: {means}")
-        Logger.info(f"Current sensor data: {current_sensor_data}")
+        Logger.debug(f"Current means: {means}")
+        Logger.debug(f"Current sensor data: {current_sensor_data}")
 
         for data in current_sensor_data:
             address = data["pi-address"]
@@ -186,17 +192,17 @@ class SensorDataManager:
                         self.calculate_means(self.get_newest_sensor_data(5), address, [channel])
                 else:
                     if self.result_register[address][channel] >= hysteresis_value:
-                        Logger.info(f"Above threshold: {address} {channel}")
+                        Logger.debug(f"Above threshold: {address} {channel}")
                         self.result_register[address][channel] = 0
                         self.run_hysteresis_condition(address, channel, "up")
                     elif self.result_register[address][channel] <= -hysteresis_value:
-                        Logger.info(f"Below threshold: {address} {channel}")
+                        Logger.debug(f"Below threshold: {address} {channel}")
                         self.result_register[address][channel] = 0
                         self.run_hysteresis_condition(address, channel, "down")
-        Logger.info(f"Result register: {self.result_register}")
+        Logger.debug(f"Result register: {self.result_register}")
     
     def run_hysteresis_condition(self, address, channel, condition):
-        """Aktualisiert das Kanalregister basierend auf der Hysterese-Bedingung."""
+        """Updates the channel register based on the hysteresis condition."""
         if address not in self.channel_level_register:
             self.channel_level_register[address] = {}
         if channel not in self.channel_level_register[address]:
@@ -207,17 +213,16 @@ class SensorDataManager:
         elif condition == "down":
             self.channel_level_register[address][channel]["level"] = -1
 
-        Logger.info(f"Channel level register: {self.channel_level_register}")
+        Logger.debug(f"Channel level register: {self.channel_level_register}")
         self.calculate_means(self.get_newest_sensor_data(5), address, [channel])
     
     def get_system_state(self):
         config = ConfigManager(CONFIG_PATH)
         hysteresis_value = config.get_value('Local-Settings', 'hysteresis', is_int=True)
-        """Bestimmt den Systemzustand basierend auf den aktuellen Registern."""
+        """Determines the system state based on the current registers."""
         if self.channel_level_register:
             return "Red"
-        
-        # Überprüfen, ob alle Werte in result_register 0 sind
+
         all_zeros = True
         for channels in self.result_register.values():
             if any(value > hysteresis_value / 2 or value < -hysteresis_value / 2 for value in channels.values()):
@@ -231,20 +236,20 @@ class SensorDataManager:
             return "Yellow"
     
     def reset_display_data(self):
-        """Setzt die Anzeigedaten zurück."""
+        """Resets the display data."""
         self.display_data.clear()
         self.previous_display_data.clear()
 
 
 class CalibrationManager:
-    """Verantwortlich für die Durchführung und Überwachung der Kalibrierung."""
+    """Responsible for performing and monitoring calibration."""
     
     is_calibration_running = False
     calibration_status = {'status': 'Not Started'}
     
     @classmethod
     def start_calibration(cls, sensor_manager):
-        """Startet die Kalibrierungsroutine."""
+        """Starts the calibration routine."""
         cls.calibration_status = {'status': 'In Progress'}
         cls.is_calibration_running = True
 
@@ -254,19 +259,19 @@ class CalibrationManager:
         means = sensor_manager.get_means()
         sensor_manager.calculate_sensor_data_in_mean(means)
 
-        while not cls.check_calibration(sensor_manager):
+        while not cls.is_calibration_successful(sensor_manager):
             means = sensor_manager.get_means()
             sensor_manager.calculate_sensor_data_in_mean(means)
 
         sensor_manager.reset_display_data()
-        Logger.info("Calibration completed")
+        Logger.debug("Calibration completed")
         cls.calibration_status = {'status': 'Completed'}
         cls.is_calibration_running = False
         return True
     
     @classmethod
-    def check_calibration(cls, sensor_manager):
-        """Überprüft, ob die Kalibrierung erfolgreich abgeschlossen wurde."""
+    def is_calibration_successful(cls, sensor_manager):
+        """Checks if the calibration has been successfully completed."""
         config = ConfigManager(CONFIG_PATH)
         hysteresis_check = config.get_value('Local-Settings', 'hysteresis', is_int=True) + 2
 
@@ -276,25 +281,25 @@ class CalibrationManager:
             for address, channels in sensor_manager.result_register.items():
                 for channel, value in channels.items():
                     if value != 0:
-                        Logger.info("Calibration values not okay")
+                        Logger.debug("Calibration values not okay")
                         cls.is_calibration_running = True
                         return False
-            Logger.info("Calibration values okay")
+            Logger.debug("Calibration values okay")
             cls.is_calibration_running = False
 
         return True
 
 
 class DisplayDataManager:
-    """Verwaltet die Anzeige- und Komponentenerkennungslogik."""
+    """Manages the display and component recognition logic."""
 
     def __init__(self, sensor_manager):
         self.sensor_manager = sensor_manager
         self.old_detected_components = {}
         self.detection_counter = {}
 
-    def convert_data_to_display(self):
-        """Konvertiert Sensordaten in ein Anzeigeformat."""
+    def prepare_display_data(self):
+        """Converts sensor data into a display format."""
         config = ConfigManager(CONFIG_PATH)
         x_dim = config.get_value('Web-UI', 'amountX-Axis', is_int=True)
         y_dim = config.get_value('Web-UI', 'amountY-Axis', is_int=True)
@@ -306,12 +311,9 @@ class DisplayDataManager:
                 if key in self.sensor_manager.previous_display_data:
                     self.sensor_manager.display_data[key]['State'] = self.sensor_manager.previous_display_data[key]['State']
 
-        self.detect_component_levels(x_dim, y_dim) # ist es X, XX oder O -> Es kommt ein DisplayData Datensatz raus
+        self.update_component_levels(x_dim, y_dim) # ist es X, XX oder O -> Es kommt ein DisplayData Datensatz raus
         self.sensor_manager.previous_display_data = self.sensor_manager.display_data.copy()
-
-        
-        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        detected_components = self.detect_components(x_dim, y_dim)
+        detected_components = self.find_components(x_dim, y_dim)
         self.old_detected_components = copy.deepcopy(detected_components)
         self.delete_lifetime()
 
@@ -321,8 +323,8 @@ class DisplayDataManager:
             'timestamp': self.sensor_manager.newest_timestamp
         }
 
-    def detect_component_levels(self, x_dim, y_dim):
-        """Ermittelt die Zustände der verschiedenen Komponenten auf der Anzeige."""
+    def update_component_levels(self, x_dim, y_dim):
+        """Determines the states of various components on the display."""
         x_coords_negative, y_coords_negative, logic_dim_negative = set(), set(), set()
         x_coords_positive, y_coords_positive, logic_dim_positive = set(), set(), set()
 
@@ -341,7 +343,7 @@ class DisplayDataManager:
 
     @staticmethod
     def _categorize_negative(address, channel_number, x_neg, y_neg, logic_neg):
-        """Kategorisiert negative Zustände basierend auf der Adresse."""
+        """Categorizes negative states based on the address."""
         if address == "10.42.0.1":
             x_neg.add(channel_number)
         elif address == "10.42.0.2":
@@ -351,7 +353,7 @@ class DisplayDataManager:
 
     @staticmethod
     def _categorize_positive(address, channel_number, x_pos, y_pos, logic_pos):
-        """Kategorisiert positive Zustände basierend auf der Adresse."""
+        """Categorizes positive states based on the address."""
         if address == "10.42.0.1":
             x_pos.add(channel_number)
         elif address == "10.42.0.2":
@@ -360,7 +362,7 @@ class DisplayDataManager:
             logic_pos.add(channel_number)
 
     def _update_display_data(self, x_dim, y_dim, x_coords, y_coords, logic_dim, state, logic_state):
-        """Aktualisiert die Anzeigedaten basierend auf den erkannten Zuständen."""
+        """Updates the display data based on detected states."""
         for x in range(x_dim):
             for y in range(y_dim):
                 coord_key = f"{x},{y}"
@@ -368,15 +370,10 @@ class DisplayDataManager:
                     self.sensor_manager.display_data[coord_key]['State'] = state
                     if y in logic_dim:
                         self.sensor_manager.display_data[coord_key]['State'] = logic_state
-                        Logger.info(f"Logical layer detected at {coord_key}")
+                        Logger.debug(f"Logical layer detected at {coord_key}")
 
-
-
-
-
-
-    def detect_components(self, x_dim, y_dim):
-        """Erkennt Komponenten auf der Anzeige basierend auf bekannten Mustern."""
+    def find_components(self, x_dim, y_dim):
+        """Detects components on the display based on known patterns."""
         component_patterns = {
             'Transistor': [('X', 'XX', 'X')],
             'Resistor': [('XX', 'XX')],
@@ -392,12 +389,9 @@ class DisplayDataManager:
         }
 
         occupied_coords = set()
-
         self.check_old_grid(occupied_coords)
         detected_components = copy.deepcopy(self.old_detected_components)
         
-        
-
         for comp in detected_components.values():
             occupied_coords.update(comp['coordinates'])
 
@@ -410,7 +404,7 @@ class DisplayDataManager:
         return detected_components
 
     def _detect_component(self, x, y, x_dim, y_dim, component, pattern, detected_components, occupied_coords):
-        """Prüft, ob ein bestimmtes Komponenten-Muster an der Position vorhanden ist."""
+        """Checks if a specific component pattern is present at the position."""
         pattern_length = len(pattern[0])
 
         def update_detection_counter(coords, component_type):
@@ -424,16 +418,14 @@ class DisplayDataManager:
             required_count = self.required_counts.get(component_type, 10)
             return count >= required_count
 
-        # Horizontales Muster prüfen
+        # Check horizontal pattern
         if x + pattern_length - 1 < x_dim:
             if all(self.sensor_manager.display_data.get(f"{x + i},{y}", {}).get('State') == pattern[0][i]
                    and (x + i, y) not in occupied_coords for i in range(pattern_length)):
 
                 coordinates = [(x + i, y) for i in range(pattern_length)]
                 count = update_detection_counter(coordinates, component)
-                Logger.debug(f"Counting Detection {count}")
                 if is_component_fully_detected(count, component):
-                    Logger.debug(f"We have a detection")
                     comp_id = str(uuid.uuid4())
                     detected_components[comp_id] = {
                         'type': component,
@@ -443,19 +435,16 @@ class DisplayDataManager:
                         'coordinates': coordinates
                     }
                     self.detection_counter.clear()
-                    Logger.debug(f"Detection cleared")
                     occupied_coords.update(coordinates)
 
-        # Vertikales Muster prüfen
+        # Check vertical pattern
         if y + pattern_length - 1 < y_dim:
             if all(self.sensor_manager.display_data.get(f"{x},{y + i}", {}).get('State') == pattern[0][i]
                    and (x, y + i) not in occupied_coords for i in range(pattern_length)):
 
                 coordinates = [(x, y + i) for i in range(pattern_length)]
                 count = update_detection_counter(coordinates, component)
-                Logger.debug(f"Counting Detection {count}")
                 if is_component_fully_detected(count, component):
-                    Logger.debug(f"We have a detection")
                     comp_id = str(uuid.uuid4())
                     detected_components[comp_id] = {
                         'type': component,
@@ -465,7 +454,6 @@ class DisplayDataManager:
                         'coordinates': coordinates
                     }
                     self.detection_counter.clear()
-                    Logger.debug(f"Detection cleared")
                     occupied_coords.update(coordinates)
 
 
@@ -490,9 +478,9 @@ class DisplayDataManager:
             for id in removed_Components_id:
                 del old_grid_data[id]
 
-                Logger.info(f"Removed component with UUID {id} from old components because it was removed from user.")
+                Logger.debug(f"Removed component with UUID {id} from old components because it was removed from user.")
         else:
-            Logger.info(f"No old Component Grid Data available. It is empty.")
+            Logger.debug(f"No old Component Grid Data available. It is empty.")
                     
     def is_coord_occupied(self, components_dict, x, y):
         for component in components_dict.values():
@@ -503,27 +491,21 @@ class DisplayDataManager:
                  return True
         return False
 
-
-
-
-
-
-
     def delete_lifetime(self):
-        """Reduziert die Lebensdauer der Kanäle im Kanalregister und entfernt abgelaufene Einträge."""
+        """Reduces the lifetime of channels in the channel register and removes expired entries."""
         for address in list(self.sensor_manager.channel_level_register.keys()):
             for channel in list(self.sensor_manager.channel_level_register[address].keys()):
-                Logger.info("Reducing channel lifetime")
+                Logger.debug("Reducing channel lifetime")
                 self.sensor_manager.channel_level_register[address][channel]["lifetime"] -= 1
                 if self.sensor_manager.channel_level_register[address][channel]["lifetime"] <= 0:
                     del self.sensor_manager.channel_level_register[address][channel]
-                    Logger.info(f"Removed {address} {channel} from channel_level_register due to expired lifetime")
+                    Logger.debug(f"Removed {address} {channel} from channel_level_register due to expired lifetime")
             if not self.sensor_manager.channel_level_register[address]:
                 del self.sensor_manager.channel_level_register[address]
 
 
 class AppManager:
-    """Verwaltet die Flask-App und deren Routen."""
+    """Manages the Flask app and its routes."""
     
     def __init__(self, sensor_manager, display_manager):
         self.sensor_manager = sensor_manager
@@ -533,45 +515,45 @@ class AppManager:
         self.setup_routes()
 
     def setup_routes(self):
-        """Setzt die Flask-Routen für die Web-App."""
+        """Sets up the Flask routes for the web app."""
         self.app.add_url_rule('/', 'home', self.home, methods=['GET'])
         self.app.add_url_rule('/sensor_data', 'get_sensor_data', self.get_sensor_data, methods=['GET'])
         self.app.add_url_rule('/calibrate', 'start_calibration', self.start_calibration, methods=['GET'])
         self.app.add_url_rule('/calibration_status', 'get_calibration_status', self.get_calibration_status, methods=['GET'])
     
     def home(self):
-        """Rendert die Hauptseite der Webanwendung."""
+        """Renders the main page of the web application."""
         config = ConfigManager(CONFIG_PATH)
         rows = config.get_value('Web-UI', 'amountY-Axis', is_int=True)
         cols = config.get_value('Web-UI', 'amountX-Axis', is_int=True)
         return render_template('index.html', rows=rows, cols=cols)
     
     def get_sensor_data(self):
-        """Liefert die aktuellen Sensordaten und deren Anzeigezustand."""
+        """Provides the current sensor data and its display state."""
         if CalibrationManager.is_calibration_running:
             response = jsonify(message="Kalibrierung läuft")
             response.status_code = 423
             return response
         else:
             self.sensor_manager.process_sensor_data()
-            data = self.display_manager.convert_data_to_display()
+            data = self.display_manager.prepare_display_data()
 
             system_state = sensor_manager.get_system_state()
             data["SystemState"] = system_state
             return jsonify(data)
     
     def start_calibration(self):
-        """Startet den Kalibrierungsprozess."""
+        """Starts the calibration process."""
         CalibrationManager.start_calibration(self.sensor_manager)
         return jsonify(message="Kalibrierung gestartet"), 200
     
     def get_calibration_status(self):
-        """Gibt den aktuellen Status der Kalibrierung zurück."""
-        Logger.info(f"Calibration Status: {CalibrationManager.calibration_status}")
+        """Returns the current status of the calibration."""
+        Logger.debug(f"Calibration Status: {CalibrationManager.calibration_status}")
         return jsonify(CalibrationManager.calibration_status), 200
     
     def run(self):
-        """Startet die Flask-Webanwendung."""
+        """Starts the Flask web application."""
         config = ConfigManager(CONFIG_PATH)
         ip_address = config.get_value('Local-Settings', 'local_client_ip')
         port = config.get_value('Network', 'webapp_port', is_int=True)

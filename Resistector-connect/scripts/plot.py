@@ -19,7 +19,7 @@ CONFIG = {
     'y_limits': [  # Individuelle y_min und y_max für jedes Diagramm
         {'y_min': 10, 'y_max': 18},
         {'y_min': 14, 'y_max': 22},
-        {'y_min': 8, 'y_max': 16}
+        {'y_min': 14, 'y_max': 22}
     ],
     'default_value': 30,  # Standardwert für fehlende Sensordaten
     'line_colors': ['#377eb8', '#e41a1c', '#4daf4a', '#984ea3', '#a65628', '#f781bf', '#ff7f00', '#00CED1'],  # Farben
