@@ -157,20 +157,28 @@ document.addEventListener('DOMContentLoaded', (event) => {
                 if (component.type === 'LED' || component.type === 'Resistor'){   
                     circleLocation = getCirclePosition((component.x -1), component.y);                 
                     img.style.left = `${circleLocation.left}px`;
-                    //img.style.left = `0px`;
+                    img.style.width = `${circleSize*2.7}px`;
                 }else {
                     circleLocation = getCirclePosition((component.x -2), component.y);
                     img.style.left = `${circleLocation.left}px`;
+                    img.style.width = `${circleSize*4.25}px`;
                 }
                 img.style.top = `${circleLocation.top}px`;
-                img.style.width = `${circleSize*2.7}px`;
+
                 img.style.height = `${circleSize*1.2}px`;
             }
+            img.style.transform = component.orientation === 'horizontal' ? 'rotate(0deg)' : 'rotate(90deg)';
             if (component.orientation === 'vertical'){
                 circleLocation = getCirclePosition((component.x), component.y);
-                img.style.left = `${circleLocation.left-(circleSize/2.75*2)}px`;
-                img.style.top = `${circleLocation.top+(circleSize/3*2)-10}px`;
-                img.style.width = `${circleSize*2.5}px`;
+                if (component.type === 'LED' || component.type === 'Resistor'){ 
+                    img.style.width = `${circleSize*2.5}px`;
+                    img.style.left = `${circleLocation.left-(circleSize/2.5*2)}px`;
+                    img.style.top = `${circleLocation.top+(circleSize/3*2)-10}px`;
+                }else{
+                    img.style.width = `${circleSize*3.75}px`;
+                    img.style.left = `${circleLocation.left-(circleSize/1.45*2)}px`;
+                    img.style.top = `${circleLocation.top-5}px`;
+                }
                 img.style.height = `${circleSize*1.2}px`;
             }
             img.style.transform = component.orientation === 'horizontal' ? 'rotate(0deg)' : 'rotate(90deg)';

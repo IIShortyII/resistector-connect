@@ -134,11 +134,22 @@ def filter_data(pi, data, alpha=0.1):
             ema_recent_data[pi][channel].popleft()
 
         # Wenn die Pi-Adresse in den speziellen Adressen enthalten ist, Threshold-Filter anwenden
-        if pi in ["10.42.0.2", "10.42.0.3"]:
+        if pi in ["10.42.0.1"]:
             previous_value = thres_recent_data[pi][channel][-1] if thres_recent_data[pi][channel] else ema_filtered_value
-            thres_filtered_value = apply_threshold_filter(ema_filtered_value, previous_value, 10, 22, 0.5, 0.5)
+            thres_filtered_value = apply_threshold_filter(ema_filtered_value, previous_value, 8, 17, 0.3, 0.3)
             thres_filtered_data[channel] = thres_filtered_value
-            
+
+        if pi in ["10.42.0.2"]:
+            previous_value = thres_recent_data[pi][channel][-1] if thres_recent_data[pi][channel] else ema_filtered_value
+            thres_filtered_value = apply_threshold_filter(ema_filtered_value, previous_value, 10, 22, 0.3, 0.3)
+            thres_filtered_data[channel] = thres_filtered_value
+
+        if pi in ["10.42.0.3"]:
+            previous_value = thres_recent_data[pi][channel][-1] if thres_recent_data[pi][channel] else ema_filtered_value
+            thres_filtered_value = apply_threshold_filter(ema_filtered_value, previous_value, 8, 17, 0.3, 0.3)
+            thres_filtered_data[channel] = thres_filtered_value
+
+
             # Gefilterten Wert zur Deque hinzufügen
             thres_recent_data[pi][channel].append(thres_filtered_value)
             if len(thres_recent_data[pi][channel]) > 10:
@@ -164,7 +175,7 @@ def main():
     try:
         while True:
             request_data(pis, port, filename)
-            time.sleep(1)
+            time.sleep(0.8)
     except KeyboardInterrupt:
         logging.info("Measurement server stopped by user")
 

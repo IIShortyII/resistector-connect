@@ -13,11 +13,14 @@ CONFIG = {
     'data_dir': 'measurement_data',
     'log_dir': os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs'),
     'log_file': 'plot.log',
-    'plot_interval': 1,
+    'plot_interval': 1000,  # Interval in Millisekunden
     'figsize': (10, 18),
     'num_subplots': 3,
-    'y_max': 22,
-    'y_min': 12,
+    'y_limits': [  # Individuelle y_min und y_max für jedes Diagramm
+        {'y_min': 10, 'y_max': 18},
+        {'y_min': 14, 'y_max': 22},
+        {'y_min': 8, 'y_max': 16}
+    ],
     'default_value': 30,  # Standardwert für fehlende Sensordaten
     'line_colors': ['#377eb8', '#e41a1c', '#4daf4a', '#984ea3', '#a65628', '#f781bf', '#ff7f00', '#00CED1'],  # Farben
     'line_styles': ['-', '--', ':', '-.', 'solid', 'dashed', 'dashdot', 'dotted']  # Linienstile
@@ -69,9 +72,10 @@ def plot_data(axs, data):
     unique_addresses = df['pi-address'].unique()
     lines = []
 
-    for ax in axs:
+    for i, ax in enumerate(axs):
         ax.clear()
-        ax.set_ylim(CONFIG['y_min'], CONFIG['y_max'])
+        y_limits = CONFIG['y_limits'][i]
+        ax.set_ylim(y_limits['y_min'], y_limits['y_max'])
 
     for i, pi_address in enumerate(unique_addresses):
         df_pi = df[df['pi-address'] == pi_address]

@@ -131,10 +131,16 @@ class SensorDataManager:
     
     def get_means(self):
         """Gibt die berechneten Mittelwerte zurück."""
-        return {
-            pi_address: {channel: np.mean(values) for channel, values in channels.items()}
-            for pi_address, channels in self.mean_values.items()
-        }
+        means = {}
+        for pi_address, channels in self.mean_values.items():
+            means[pi_address] = {}
+            for channel, values in channels.items():
+                if len(values) > 0:
+                    means[pi_address][channel] = np.mean(values)
+                else:
+                    means[pi_address][channel] = np.nan  # Oder ein anderer Standardwert, z.B. 0
+        return means
+
     
     def process_sensor_data(self):
         """Verarbeitet die Sensordaten, indem Mittelwerte berechnet und Zustände aktualisiert werden."""
@@ -194,7 +200,7 @@ class SensorDataManager:
         if address not in self.channel_level_register:
             self.channel_level_register[address] = {}
         if channel not in self.channel_level_register[address]:
-            self.channel_level_register[address][channel] = {"level": 0, "lifetime": 5}
+            self.channel_level_register[address][channel] = {"level": 0, "lifetime": 10}
 
         if condition == "up":
             self.channel_level_register[address][channel]["level"] = 1
@@ -285,6 +291,7 @@ class DisplayDataManager:
     def __init__(self, sensor_manager):
         self.sensor_manager = sensor_manager
         self.old_detected_components = {}
+        self.detection_counter = {}
 
     def convert_data_to_display(self):
         """Konvertiert Sensordaten in ein Anzeigeformat."""
@@ -377,6 +384,13 @@ class DisplayDataManager:
             'LED': [('X', 'X')]
         }
 
+        self.required_counts = {
+            'LED': 8,
+            'Resistor': 6,
+            'Transistor': 1,
+            'Cable': 4
+        }
+
         occupied_coords = set()
 
         self.check_old_grid(occupied_coords)
@@ -399,35 +413,60 @@ class DisplayDataManager:
         """Prüft, ob ein bestimmtes Komponenten-Muster an der Position vorhanden ist."""
         pattern_length = len(pattern[0])
 
-        # Check horizontal pattern
+        def update_detection_counter(coords, component_type):
+            key = (component_type, tuple(coords))
+            if key not in self.detection_counter:
+                self.detection_counter[key] = 0
+            self.detection_counter[key] += 1
+            return self.detection_counter[key]
+
+        def is_component_fully_detected(count, component_type):
+            required_count = self.required_counts.get(component_type, 10)
+            return count >= required_count
+
+        # Horizontales Muster prüfen
         if x + pattern_length - 1 < x_dim:
             if all(self.sensor_manager.display_data.get(f"{x + i},{y}", {}).get('State') == pattern[0][i]
                    and (x + i, y) not in occupied_coords for i in range(pattern_length)):
-                comp_id = str(uuid.uuid4())
-                coordinates = [(x + i, y) for i in range(pattern_length)]
-                detected_components[comp_id] = {
-                    'type': component,
-                    'x': x + pattern_length // 2,
-                    'y': y,
-                    'orientation': 'horizontal',
-                    'coordinates': coordinates
-                }
-                occupied_coords.update(coordinates)  # Mark these coordinates as occupied
 
-        # Check vertical pattern
+                coordinates = [(x + i, y) for i in range(pattern_length)]
+                count = update_detection_counter(coordinates, component)
+                Logger.debug(f"Counting Detection {count}")
+                if is_component_fully_detected(count, component):
+                    Logger.debug(f"We have a detection")
+                    comp_id = str(uuid.uuid4())
+                    detected_components[comp_id] = {
+                        'type': component,
+                        'x': x + pattern_length -1,
+                        'y': y,
+                        'orientation': 'horizontal',
+                        'coordinates': coordinates
+                    }
+                    self.detection_counter.clear()
+                    Logger.debug(f"Detection cleared")
+                    occupied_coords.update(coordinates)
+
+        # Vertikales Muster prüfen
         if y + pattern_length - 1 < y_dim:
             if all(self.sensor_manager.display_data.get(f"{x},{y + i}", {}).get('State') == pattern[0][i]
                    and (x, y + i) not in occupied_coords for i in range(pattern_length)):
-                comp_id = str(uuid.uuid4())
+
                 coordinates = [(x, y + i) for i in range(pattern_length)]
-                detected_components[comp_id] = {
-                    'type': component,
-                    'x': x,
-                    'y': y + pattern_length // 2,
-                    'orientation': 'vertical',
-                    'coordinates': coordinates
-                }
-                occupied_coords.update(coordinates)  # Mark these coordinates as occupied
+                count = update_detection_counter(coordinates, component)
+                Logger.debug(f"Counting Detection {count}")
+                if is_component_fully_detected(count, component):
+                    Logger.debug(f"We have a detection")
+                    comp_id = str(uuid.uuid4())
+                    detected_components[comp_id] = {
+                        'type': component,
+                        'x': x,
+                        'y': y + pattern_length // 2,
+                        'orientation': 'vertical',
+                        'coordinates': coordinates
+                    }
+                    self.detection_counter.clear()
+                    Logger.debug(f"Detection cleared")
+                    occupied_coords.update(coordinates)
 
 
     def check_old_grid(self, occupied_coords):
