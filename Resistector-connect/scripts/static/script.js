@@ -169,9 +169,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setComponentPosition(img, component, circleLocation) {
+        img.style.transform = component.orientation === 'horizontal' ? 'rotate(0deg)' : 'rotate(90deg)';
         const circleSize = getCircleSize();
         if (component.orientation === 'horizontal') {
-            img.style.left = `${circleLocation.left}px`;
+            img.style.left = component.type === 'LED' || component.type === 'Resistor' 
+                ? `${circleLocation.left-7}px`
+                : `${circleLocation.left-circleSize*1.63}px`;
             img.style.width = component.type === 'LED' || component.type === 'Resistor'
                 ? `${circleSize * 2.7}px`
                 : `${circleSize * 4.25}px`;
@@ -181,13 +184,13 @@ document.addEventListener('DOMContentLoaded', () => {
             img.style.width = component.type === 'LED' || component.type === 'Resistor'
                 ? `${circleSize * 2.5}px`
                 : `${circleSize * 3.75}px`;
-            img.style.left = `${circleLocation.left - (circleSize / 2.5 * 2)}px`;
+            img.style.left = `${circleLocation.left - (circleSize / 1.5 * 2)}px`;
             img.style.top = component.type === 'LED' || component.type === 'Resistor'
                 ? `${circleLocation.top + (circleSize / 3 * 2) - 10}px`
                 : `${circleLocation.top - 5}px`;
             img.style.height = `${circleSize * 1.2}px`;
         }
-        img.style.transform = component.orientation === 'horizontal' ? 'rotate(0deg)' : 'rotate(90deg)';
+
     }
 
     function getCircleSize() {

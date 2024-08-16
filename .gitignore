@@ -12,3 +12,7 @@ scripts/archiv/
 scripts/tmp/*
 !scripts/tmp/
 Resistector-connect/20240807081619_measurementData.json
+Resistector-connect/logs/
+Resistector-connect/measurement_data/
+Resistector-connect/scripts/tmp/
+Resistector-connect/.vscode/

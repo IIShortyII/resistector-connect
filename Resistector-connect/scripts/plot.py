@@ -79,8 +79,8 @@ def plot_data(axs, data):
 
     for i, pi_address in enumerate(unique_addresses):
         df_pi = df[df['pi-address'] == pi_address]
-        axs[i].set_title(f'Daten für Pi-Adresse: {pi_address}')
-        axs[i].set_ylabel('Wert')
+        axs[i].set_title(f'Data of Pi: {pi_address}')
+        axs[i].set_ylabel('Resistance Value')
 
         sensor_data_keys = df_pi['sensor_data'].apply(lambda x: x.keys() if isinstance(x, dict) else {}).explode().unique()
         for j, channel in enumerate(sensor_data_keys):
@@ -94,7 +94,7 @@ def plot_data(axs, data):
         axs[i].legend(loc='upper left')
         axs[i].grid(True)
 
-    axs[-1].set_xlabel('Zeitstempel')
+    axs[-1].set_xlabel('Timestamp')
     plt.tight_layout()
     
     return lines

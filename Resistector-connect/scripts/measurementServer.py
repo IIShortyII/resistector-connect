@@ -223,7 +223,7 @@ def filter_data(pi, data, alpha=0.1):
             thres_recent_data[pi][channel].append(thres_filtered_value)
             if len(thres_recent_data[pi][channel]) > 10:
                 thres_recent_data[pi][channel].popleft()
-
+   
     # Return threshold-filtered data if applied, otherwise return EMA-filtered data
     if thres_filtered_data:
         return thres_filtered_data
